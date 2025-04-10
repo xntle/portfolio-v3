@@ -8,6 +8,9 @@ export default function About() {
           <b>(B.S) Computer Science</b> with a minor in <b>Tech Management</b> at UC Davis
         </p>
         <p className=" text-sm  mt-2">
+          Championship of 2 start up competitions (Flagup 2024) (Swinbiz 2023)
+        </p>
+        <p className=" text-sm  mt-2">
           <b>Other Hobbies:</b> Video Editing, Cool ChatGPT Prompts, 3D-Modeling, Streaming, Badminton
         </p>
         <div className=" text-sm mt-4 flex space-x-4 text-blue-500 underline">
