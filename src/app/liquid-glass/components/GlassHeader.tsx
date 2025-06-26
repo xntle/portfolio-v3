@@ -1,11 +1,15 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import GlassButton from "../package/glass-button";
+import GlassText from "../package/glass-text";
+import clsx from "clsx";
 
-const Header = () => {
+const navItems = ["about", "experience", "projects", "contacts"];
+
+export default function GlassHeader() {
   const [activeSection, setActiveSection] = useState("about");
-  const navItems = ["about", "experience", "projects", "contacts"];
 
   const scrollToSection = (id: string) => {
     const section = document.getElementById(id);
@@ -13,7 +17,6 @@ const Header = () => {
       const yOffset = -50;
       const y =
         section.getBoundingClientRect().top + window.pageYOffset + yOffset;
-
       window.scrollTo({ top: y, behavior: "smooth" });
       setActiveSection(id);
     }
@@ -40,43 +43,40 @@ const Header = () => {
   }, []);
 
   return (
-    <section className="fixed top-0 left-0 w-full z-50 flex items-center justify-center px-6 py-4">
-      {/* Left: Logo */}
-      <div className="absolute left-6">
-        <span className="text-xl font-bold">:-)</span>
+    <header className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 w-screen max-w-4xl px-4 py-2 rounded-full backdrop-blur-md bg-white/10 border border-white/20 shadow-lg flex justify-between items-center ">
+      {/* Left Logo */}
+      <div>
+        <GlassText size="lg" className="text-white/80">
+          :-)
+        </GlassText>
       </div>
 
-      {/* Center: Nav */}
-      <nav className="hidden sm:flex space-x-4">
+      {/* Center Nav */}
+      <nav className="hidden md:flex gap-3">
         {navItems.map((id) => (
-          <button
+          <GlassButton
             key={id}
+            className={clsx(
+              "px-4 py-1 text-sm",
+              activeSection === id
+                ? "bg-white/20 border border-white/30"
+                : "bg-transparent border border-transparent"
+            )}
             onClick={() => scrollToSection(id)}
-            className={`w-28 px-4 py-0.5 rounded-full border  duration-300
-          ${
-            activeSection === id
-              ? "bg-black text-white border-black"
-              : "bg-white text-black border-black"
-          }
-          hover:opacity-90 hover:ring-2 hover:ring-offset-2 hover:ring-[#e5372c] transition
-        `}
           >
             {id}
-          </button>
+          </GlassButton>
         ))}
       </nav>
 
-      {/* Right: Playground Button */}
-      <div className="absolute right-6">
-        <Link
-          href="/playground"
-          className="w-28 px-4 py-1 rounded-full bg-[#e5372c] text-white hover:opacity-90  hover:ring-2 hover:ring-offset-2 hover:ring-[#e5372c] transition"
-        >
-          playground
+      {/* Right Playground Link */}
+      <div>
+        <Link href="/playground">
+          <GlassButton className="px-4 py-1 text-sm bg-[#e5372c] hover:opacity-90 hover:ring-2 hover:ring-[#e5372c]">
+            playground
+          </GlassButton>
         </Link>
       </div>
-    </section>
+    </header>
   );
-};
-
-export default Header;
+}
