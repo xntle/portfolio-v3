@@ -10,6 +10,7 @@ interface Item {
   title: string;
   prompt: string | null;
   image_url: string;
+  link: string | null; // NEW
   x: number; // unused in this layout
   y: number; // unused in this layout
 }
@@ -31,6 +32,18 @@ async function getAspectRatio(src: string): Promise<number> {
     img.onerror = () => resolve(1); // fallback to square
     img.src = src;
   });
+}
+// add scheme if missing; return null if bad url
+function normalizeUrl(v: string): string | null {
+  const s = v.trim();
+  if (!s) return null;
+  try {
+    const hasProto = /^https?:\/\//i.test(s);
+    const u = new URL(hasProto ? s : `https://${s}`);
+    return u.toString();
+  } catch {
+    return null;
+  }
 }
 
 // ——— Justified layout hook ———
@@ -102,9 +115,11 @@ export default function GalleryBoard() {
   const [name, setName] = useState("");
   const [title, setTitle] = useState("");
   const [prompt, setPrompt] = useState("");
+  const [website, setWebsite] = useState(""); // NEW
   const [file, setFile] = useState<File | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+
   // add near other state
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1); // default 100%
@@ -245,7 +260,7 @@ export default function GalleryBoard() {
     (async () => {
       const { data, error } = await supabase
         .from("photos")
-        .select("id, name, title, prompt, image_url, x, y, created_at")
+        .select("id, name, title, prompt, image_url, link, x, y, created_at") // link included
         .order("created_at", { ascending: true });
 
       if (error) {
@@ -315,7 +330,10 @@ export default function GalleryBoard() {
       const image_url = urlData?.publicUrl;
       if (!image_url) throw new Error("No public URL returned");
 
-      // 3) Insert DB row
+      // 3) Normalize website
+      const link = normalizeUrl(website) || null;
+
+      // 4) Insert DB row
       const { data: insertData, error: insertErr } = await supabase
         .from("photos")
         .insert({
@@ -323,14 +341,15 @@ export default function GalleryBoard() {
           title: title.trim(),
           prompt: prompt.trim() || null,
           image_url,
+          link, // NEW
           x: 0,
           y: 0,
         })
-        .select("id, name, title, prompt, image_url, x, y")
+        .select("id, name, title, prompt, image_url, link, x, y")
         .single();
       if (insertErr) throw insertErr;
 
-      // 4) add locally with measured AR (UI shows immediately)
+      // 5) add locally with measured AR (UI shows immediately)
       const ar = await getAspectRatio(image_url);
       setItems((prev) => [...prev, { ...(insertData as Item), ar }]);
 
@@ -338,6 +357,7 @@ export default function GalleryBoard() {
       setFile(null);
       setTitle("");
       setPrompt("");
+      setWebsite(""); // reset website
       setFormOpen(false);
     } catch (err) {
       console.error(err);
@@ -367,13 +387,14 @@ export default function GalleryBoard() {
         spaceDown ? (isPanning ? "cursor-grabbing" : "cursor-grab") : ""
       }`}
     >
-      {" "}
       {/* Floating circle FAB to reopen the form */}
       <Fab
         open={formOpen}
         count={items.length}
         onClick={() => setFormOpen(true)}
       />
+
+      {/* Bottom-right credit */}
       <a
         href="https://thaianle.com"
         target="_blank"
@@ -382,6 +403,7 @@ export default function GalleryBoard() {
       >
         Made with 🩶 by Thai An Le :-)
       </a>
+
       {/* Fullscreen frosted form */}
       <AnimatePresence>
         {formOpen && (
@@ -390,16 +412,19 @@ export default function GalleryBoard() {
             name={name}
             title={title}
             prompt={prompt}
+            website={website} // NEW
             file={file}
             setName={setName}
             setTitle={setTitle}
             setPrompt={setPrompt}
+            setWebsite={setWebsite} // NEW
             setFile={setFile}
             onAdd={onAdd}
             onClose={() => setFormOpen(false)}
           />
         )}
       </AnimatePresence>
+
       {/* Justified Gallery Area */}
       <div
         className="absolute inset-0 px-4 pt-6 pb-4 origin-top-left"
@@ -425,6 +450,7 @@ export default function GalleryBoard() {
           ))}
         </div>
       </div>
+
       {/* Modal for details (scrollable page) */}
       <AnimatePresence>
         {activeItem && (
@@ -456,16 +482,30 @@ export default function GalleryBoard() {
                 <img
                   src={activeItem.image_url}
                   alt={activeItem.title}
-                  className="w-full h-auto rounded-xl"
+                  className="block w-full h-auto rounded-xl align-top"
                 />
-                <h3 className="mt-4 text-xl text-white font-semibold">
+                <h3 className="mt-4 text-xl font-semibold text-white">
                   {activeItem.title}
                 </h3>
-                {activeItem.name && (
-                  <div className="text-sm text-white">by {activeItem.name}</div>
+                {(activeItem.name || activeItem.link) && (
+                  <div className="text-sm text-white/90">
+                    generated by{" "}
+                    {activeItem.link ? (
+                      <a
+                        href={activeItem.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline hover:opacity-80"
+                      >
+                        {activeItem.name || activeItem.link}
+                      </a>
+                    ) : (
+                      activeItem.name
+                    )}
+                  </div>
                 )}
                 {activeItem.prompt && (
-                  <p className="mt-2 text-sm leading-relaxed text-white">
+                  <p className="mt-2 text-sm leading-relaxed text-white/90">
                     {activeItem.prompt}
                   </p>
                 )}
@@ -505,7 +545,7 @@ function CardFixed({
       <img
         src={item.image_url}
         alt={item.title}
-        className="h-full w-full object-contain"
+        className="block h-full w-full object-contain align-top"
         draggable={false}
       />
 
@@ -518,8 +558,22 @@ function CardFixed({
       >
         <div className="w-full p-4 text-white">
           <div className="text-md font-medium leading-tight">{item.title}</div>
-          {item.name && (
-            <div className="text-xs opacity-80">by {item.name}</div>
+          {(item.name || item.link) && (
+            <div className="text-xs opacity-80">
+              generated by{" "}
+              {item.link ? (
+                <a
+                  href={item.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  {item.name || item.link}
+                </a>
+              ) : (
+                item.name
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -582,9 +636,11 @@ function FullscreenForm({
   title,
   file,
   prompt,
+  website, // NEW
   setName,
   setTitle,
   setPrompt,
+  setWebsite, // NEW
   setFile,
   onAdd,
   onClose,
@@ -594,9 +650,11 @@ function FullscreenForm({
   title: string;
   file: File | null;
   prompt: string;
+  website: string; // NEW
   setName: (v: string) => void;
   setTitle: (v: string) => void;
   setPrompt: (v: string) => void;
+  setWebsite: (v: string) => void; // NEW
   setFile: (f: File | null) => void;
   onAdd: () => void;
   onClose: () => void;
@@ -699,6 +757,16 @@ function FullscreenForm({
                 </div>
               )}
             </div>
+
+            {/* Website input (optional) */}
+            <input
+              type="url"
+              inputMode="url"
+              className="sm:col-span-4 rounded-xl border border-white/20 bg-white/20 px-3 py-2 text-white placeholder-white/70 outline-none backdrop-blur focus:ring-2 focus:ring-[#e1800a]"
+              placeholder="Website (optional) — https://example.com"
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+            />
 
             <textarea
               className="sm:col-span-4 rounded-xl border border-white/20 bg-white/20 px-3 py-2 text-white placeholder-white/70 outline-none backdrop-blur focus:ring-2 focus:ring-[#e1800a]"
