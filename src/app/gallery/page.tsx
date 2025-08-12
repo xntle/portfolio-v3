@@ -374,6 +374,14 @@ export default function GalleryBoard() {
         count={items.length}
         onClick={() => setFormOpen(true)}
       />
+      <a
+        href="https://thaianle.com"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-4 right-4 z-50 rounded-lg bg-black/70 px-3 py-1 text-xs text-white backdrop-blur-md transition hover:bg-black/90"
+      >
+        Made with 🩶 by Thai An Le :-)
+      </a>
       {/* Fullscreen frosted form */}
       <AnimatePresence>
         {formOpen && (
