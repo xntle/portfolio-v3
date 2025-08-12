@@ -177,8 +177,8 @@ export default function GalleryBoard() {
     window.addEventListener("keydown", onKeyDown, { passive: false });
     window.addEventListener("keyup", onKeyUp);
     return () => {
-      window.removeEventListener("keydown", onKeyDown as any);
-      window.removeEventListener("keyup", onKeyUp as any);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
     };
   }, [isPanning]);
 
@@ -270,7 +270,7 @@ export default function GalleryBoard() {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "photos" },
-        async (payload: any) => {
+        async (payload) => {
           const row = payload.new as Item;
           const ar = await getAspectRatio(row.image_url);
           setItems((prev) => [...prev, { ...row, ar }]);
@@ -279,7 +279,7 @@ export default function GalleryBoard() {
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "photos" },
-        async (payload: any) => {
+        async (payload) => {
           const row = payload.new as Item;
           const ar = await getAspectRatio(row.image_url);
           setItems((prev) =>
@@ -341,7 +341,7 @@ export default function GalleryBoard() {
       setFormOpen(false);
     } catch (err) {
       console.error(err);
-      alert(`Upload failed: ${String((err as any)?.message || err)}`);
+      alert(`Upload failed: ${String((err as Error)?.message || err)}`);
     } finally {
       setIsAdding(false);
     }
