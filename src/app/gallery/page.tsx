@@ -46,6 +46,15 @@ function normalizeUrl(v: string): string | null {
   }
 }
 
+// upsert + dedupe helpers
+function upsertById<T extends { id: string }>(arr: T[], item: T) {
+  const i = arr.findIndex((x) => x.id === item.id);
+  if (i === -1) return [...arr, item];
+  const next = arr.slice();
+  next[i] = { ...arr[i], ...item };
+  return next;
+}
+
 // ——— Justified layout hook ———
 // Packs items into 2–4 rows (auto), each row scaled to fill viewport width
 function useJustifiedLayout(items: Ph[], gapPx = 16) {
@@ -129,6 +138,10 @@ export default function GalleryBoard() {
   const [spaceDown, setSpaceDown] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+
+  // track IDs we've rendered to avoid duplicate rows from Realtime
+  const seenIdsRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     const disablePinchZoom = (e: TouchEvent) => {
       if (e.touches.length > 1) {
@@ -275,10 +288,12 @@ export default function GalleryBoard() {
         }))
       );
       setItems(withAR);
+      // seed the seen set so Realtime doesn't double-add initial rows
+      seenIdsRef.current = new Set(withAR.map((i) => i.id));
     })();
   }, []);
 
-  // Realtime updates (Mentimeter-style)
+  // Realtime updates (deduped + upsert)
   useEffect(() => {
     const channel = supabase
       .channel("photos-realtime")
@@ -287,8 +302,13 @@ export default function GalleryBoard() {
         { event: "INSERT", schema: "public", table: "photos" },
         async (payload) => {
           const row = payload.new as Item;
+          if (seenIdsRef.current.has(row.id)) return; // already present
           const ar = await getAspectRatio(row.image_url);
-          setItems((prev) => [...prev, { ...row, ar }]);
+          setItems((prev) => {
+            const next = upsertById(prev, { ...row, ar });
+            seenIdsRef.current.add(row.id);
+            return next;
+          });
         }
       )
       .on(
@@ -297,9 +317,11 @@ export default function GalleryBoard() {
         async (payload) => {
           const row = payload.new as Item;
           const ar = await getAspectRatio(row.image_url);
-          setItems((prev) =>
-            prev.map((it) => (it.id === row.id ? { ...row, ar } : it))
-          );
+          setItems((prev) => {
+            const next = upsertById(prev, { ...row, ar });
+            seenIdsRef.current.add(row.id);
+            return next;
+          });
         }
       )
       .subscribe();
@@ -309,7 +331,7 @@ export default function GalleryBoard() {
     };
   }, []);
 
-  // Create a new card (upload + insert)
+  // Create a new card (upload + insert) — rely on Realtime to add it
   const onAdd = async () => {
     if (!file || !title.trim()) return;
     try {
@@ -333,27 +355,19 @@ export default function GalleryBoard() {
       // 3) Normalize website
       const link = normalizeUrl(website) || null;
 
-      // 4) Insert DB row
-      const { data: insertData, error: insertErr } = await supabase
-        .from("photos")
-        .insert({
-          name: name.trim() || null,
-          title: title.trim(),
-          prompt: prompt.trim() || null,
-          image_url,
-          link, // NEW
-          x: 0,
-          y: 0,
-        })
-        .select("id, name, title, prompt, image_url, link, x, y")
-        .single();
+      // 4) Insert DB row (Realtime INSERT will update UI)
+      const { error: insertErr } = await supabase.from("photos").insert({
+        name: name.trim() || null,
+        title: title.trim(),
+        prompt: prompt.trim() || null,
+        image_url,
+        link, // NEW
+        x: 0,
+        y: 0,
+      });
       if (insertErr) throw insertErr;
 
-      // 5) add locally with measured AR (UI shows immediately)
-      const ar = await getAspectRatio(image_url);
-      setItems((prev) => [...prev, { ...(insertData as Item), ar }]);
-
-      // reset + minimize form
+      // reset + minimize form (don't setItems here to avoid duplicates)
       setFile(null);
       setTitle("");
       setPrompt("");
