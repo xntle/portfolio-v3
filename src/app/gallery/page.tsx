@@ -202,7 +202,7 @@ export default function GalleryBoard() {
     setPan({ x: originRef.current.x + dx, y: originRef.current.y + dy });
   };
 
-  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+  const onPointerUp = () => {
     if (!isPanning) return;
     setIsPanning(false);
     panStartRef.current = null;
@@ -509,9 +509,9 @@ function CardFixed({
                    group-hover:opacity-100 group-hover:bg-black/50 group-hover:backdrop-blur-sm"
       >
         <div className="w-full p-4 text-white">
-          <div className="text-3xl font-medium leading-tight">{item.title}</div>
+          <div className="text-md font-medium leading-tight">{item.title}</div>
           {item.name && (
-            <div className="text-xl opacity-80">by {item.name}</div>
+            <div className="text-xs opacity-80">by {item.name}</div>
           )}
         </div>
       </div>
