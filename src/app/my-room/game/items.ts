@@ -1,7 +1,6 @@
 import { Item } from "./types";
-import { MAIN_W, SIDE_WALL_W, CENTER_TOP_W, mainLeft } from "./constants";
+import { SIDE_WALL_W, CENTER_TOP_W, mainLeft } from "./constants";
 
-const mainLeftGlobal = mainLeft;
 const centerLeftGlobal = mainLeft + SIDE_WALL_W;
 
 export const ITEMS: Item[] = [

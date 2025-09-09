@@ -17,7 +17,7 @@ import { preloadSprites } from "./game/sprites";
 import { runDevChecks } from "./game/devChecks";
 import GridFloor from "../components/my-room/GridFloor";
 import Overlays from "../components/my-room/Overlays";
-import Lights from "../components/my-room/Lights";
+// import Lights from "../components/my-room/Lights";
 import PlayerSprite, { Dir } from "../components/my-room/PlayerSprite";
 import { preloadPlayerSprites } from "./game/sprites";
 import DialogueBox, { DialogueData } from "../components/my-room/DialogueBox";
@@ -39,7 +39,7 @@ export default function GameRoot() {
   const items = useMemo<Item[]>(() => ITEMS, []);
   const itemOcc = useMemo(() => buildItemOcc(items), [items]);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
-  const [time, setTime] = useState("");
+  //   const [time, setTime] = useState("");
   const [flags, setFlags] = useState<Flags>({
     shoesOff: false,
     shoesChoiceMade: false,
@@ -52,6 +52,8 @@ export default function GameRoot() {
     shoeWarnLevel: 0,
   });
   const BOARD_W = COLS * TILE_PX;
+  const resetToastRef = useRef<number | null>(null); // for "R"
+  const introToastRef = useRef<number | null>(null); // for "J"
 
   const [welcomeOpen, setWelcomeOpen] = useState<boolean>(() => {
     // show every time; or persist once:
@@ -68,22 +70,11 @@ export default function GameRoot() {
       } catch {}
     }
   }, [welcomeOpen]);
-
   useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setTime(
-        now.toLocaleTimeString("en-US", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        })
-      );
+    return () => {
+      if (resetToastRef.current) clearTimeout(resetToastRef.current);
+      if (introToastRef.current) clearTimeout(introToastRef.current);
     };
-
-    updateTime(); // set immediately
-    const interval = setInterval(updateTime, 1000); // update every second
-    return () => clearInterval(interval);
   }, []);
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -172,9 +163,9 @@ export default function GameRoot() {
   }, []);
 
   const [pos, setPos] = useState<Pos>(start);
-  const [toast, setToast] = useState<string | null>(
-    "Welcome! Press J to take your shoes off. Move with WASD/Arrows."
-  );
+  //   const [toast, setToast] = useState<string | null>(
+  //     "Welcome! Press J to take your shoes off. Move with WASD/Arrows."
+  //   );
 
   const focusRef = useRef<HTMLDivElement>(null);
   // tile center -> pixel coords
@@ -199,6 +190,39 @@ export default function GameRoot() {
   );
   const [frameIndex, setFrameIndex] = useState<0 | 1>(0); // 0 = *1.png*, 1 = *2.png*
   const queuedDirRef = useRef<Dir | null>(null);
+  // pool a few audio elements to prevent play-lag overlaps
+  const footPoolRef = useRef<HTMLAudioElement[]>([]);
+  const footIdxRef = useRef(0);
+
+  useEffect(() => {
+    const make = () => {
+      const a = new Audio("/audio/walk.mp3");
+      a.preload = "auto";
+      a.volume = 0.5; // base volume
+      return a;
+    };
+    footPoolRef.current = [make(), make(), make(), make()];
+    return () => {
+      footPoolRef.current.forEach((a) => {
+        a.pause();
+        a.src = "";
+      });
+      footPoolRef.current = [];
+    };
+  }, []);
+
+  function playFoot(vol = 0.5) {
+    if (!audioUnlocked) return; // reuse your existing unlock flag
+    const pool = footPoolRef.current;
+    if (!pool.length) return;
+    const a = pool[footIdxRef.current++ % pool.length];
+    try {
+      a.pause();
+      a.currentTime = 0;
+      a.volume = vol;
+      a.play().catch(() => {});
+    } catch {}
+  }
 
   useEffect(() => {
     preloadPlayerSprites();
@@ -316,6 +340,8 @@ export default function GameRoot() {
       start: performance.now(),
       dur: 140,
     }); // tweak speed here
+    playFoot(0.2);
+    window.clearTimeout((startStep as any)._half);
   }
 
   useEffect(() => {
@@ -334,9 +360,9 @@ export default function GameRoot() {
   // Dev checks (safe to disable if you like)
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
-      runDevChecks(walkable, items, wallOcc);
+      runDevChecks(walkable, items);
     }
-  }, [walkable, items, wallOcc]);
+  }, [walkable, items]);
 
   // flip frames while moving
   useEffect(() => {
@@ -378,15 +404,6 @@ export default function GameRoot() {
   // Movement (blocks walls AND items)
   const blockedByItem = (r: number, c: number) => !!itemOcc[r]?.[c];
   const blockedByWall = (r: number, c: number) => !!wallOcc[r]?.[c];
-  const tryMove = (dr: number, dc: number) => {
-    setPos((p) => {
-      const r2 = clamp(p.r + dr, 0, ROWS - 1);
-      const c2 = clamp(p.c + dc, 0, COLS - 1);
-      if (walkable[r2][c2] && !blockedByItem(r2, c2) && !blockedByWall(r2, c2))
-        return { r: r2, c: c2 };
-      return p;
-    });
-  };
 
   const activeItem = useMemo(() => firstActiveItem(pos, items), [pos, items]);
 
@@ -400,7 +417,6 @@ export default function GameRoot() {
     if (!it) {
       // Developer hint: wrong id/typo
       console.warn("[interactWith] item not found:", target);
-      setToast("Can't interact (dev: unknown item).");
       return;
     }
 
@@ -421,42 +437,31 @@ export default function GameRoot() {
   }
 
   const onKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
-    if (!audioUnlocked) setAudioUnlocked(true);
-
     const key = e.key.toLowerCase();
-    if (welcomeOpen) {
-      // only allow Enter (StartScreen listens globally too)
-      if (key === "enter") e.preventDefault();
-      return;
-    }
-    if (helpOpen) {
-      // HelpOverlay intercepts Enter/Esc; ignore movement
-      if (key === "enter" || key === "escape") e.preventDefault();
-      return;
-    }
-
     let handled = true;
+
     if (key === "arrowup" || key === "w") startStep("up");
     else if (key === "arrowdown" || key === "s") startStep("down");
     else if (key === "arrowleft" || key === "a") startStep("left");
     else if (key === "arrowright" || key === "d") startStep("right");
     else if (key === "r") {
+      setAnim(null);
       setPos(start);
-      setToast("Back at the entrance.");
-      window.clearTimeout((onKeyDown as any)._t);
-      (onKeyDown as any)._t = window.setTimeout(() => setToast(null), 1200);
+      if (resetToastRef.current) clearTimeout(resetToastRef.current);
     } else if (key === "x") {
-      if (activeItem) interactWith(activeItem.id);
-      else handled = false;
+      if (activeItem) {
+        // prefer passing the whole item:
+        interactWith(activeItem);
+        // If your signature expects an id, make interactWith accept Item | Item["id"],
+        // or keep this: interactWith(activeItem.id)
+      } else handled = false;
     } else if (key === "j") {
       setFlags((f) => {
         if (f.shoesOff) return f;
-        setToast("Shoes off. Welcome! ✨");
         setDialogOpen(false); // stop yelling if open
+        if (introToastRef.current) clearTimeout(introToastRef.current);
         return { ...f, shoesOff: true, shoesChoiceMade: true };
       });
-      window.clearTimeout((onKeyDown as any)._t2);
-      (onKeyDown as any)._t2 = window.setTimeout(() => setToast(null), 1500);
     } else handled = false;
 
     if (handled) e.preventDefault();

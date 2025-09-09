@@ -1,11 +1,7 @@
 import { Item, Wall } from "./types";
 import { buildItemOcc } from "./utils";
 
-export function runDevChecks(
-  walkable: boolean[][],
-  items: Item[],
-  wallOcc: (Wall | null)[][]
-) {
+export function runDevChecks(walkable: boolean[][], items: Item[]) {
   // Keep this light and non-breaking; your constants have changed a few times.
   const total = walkable.flat().reduce((a, b) => a + (b ? 1 : 0), 0);
   console.debug("[dev] walkable cells:", total);

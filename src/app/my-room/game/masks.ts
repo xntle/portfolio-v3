@@ -8,13 +8,9 @@ import {
   MAIN_W,
   SIDE_WALL_W,
   CENTER_TOP_W,
-  MID_WALL_W,
   MID_WALL_H,
   mainLeft,
   centerWallLeft,
-  WALK_MIN,
-  WALK_MAX,
-  MID_WALL_START,
 } from "./constants";
 import { Wall } from "./types";
 
