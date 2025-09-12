@@ -477,7 +477,7 @@ export default function GameRoot() {
   };
 
   return (
-    <div className="min-h-dvh w-full bg-neutral-950 flex items-center justify-center">
+    <div className="min-h-dvh w-full bg-black flex items-center justify-center">
       <div
         ref={focusRef}
         tabIndex={0}
