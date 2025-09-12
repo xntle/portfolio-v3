@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { Item } from "../../my-room/game/types";
+import { Pos, Item } from "../../my-room/game/types";
 
 type Props = {
   rows: number;
@@ -8,6 +8,7 @@ type Props = {
   tilePx: number;
   tileSrc: string;
   walkable: boolean[][];
+  pos: Pos;
   activeItem: Item | null;
 };
 
@@ -17,6 +18,7 @@ export default function GridFloor({
   tilePx,
   tileSrc,
   walkable,
+  pos: _pos,
   activeItem,
 }: Props) {
   return (
