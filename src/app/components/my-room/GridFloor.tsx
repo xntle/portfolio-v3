@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { Pos, Item } from "../../my-room/game/types";
+import { Item } from "../../my-room/game/types";
 
 type Props = {
   rows: number;
