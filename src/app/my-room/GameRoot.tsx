@@ -10,7 +10,7 @@ import {
   ENTRANCE_W,
 } from "./game/constants";
 import { Pos, Flags, Item } from "./game/types";
-import { clamp, buildItemOcc, firstActiveItem } from "./game/utils";
+import { buildItemOcc, firstActiveItem } from "./game/utils";
 import { buildWalkable, buildWalls } from "./game/masks";
 import { ITEMS } from "./game/items";
 import { preloadSprites } from "./game/sprites";
@@ -52,8 +52,6 @@ export default function GameRoot() {
     shoeWarnLevel: 0,
   });
   const BOARD_W = COLS * TILE_PX;
-  const resetToastRef = useRef<number | null>(null); // for "R"
-  const introToastRef = useRef<number | null>(null); // for "J"
 
   const [welcomeOpen, setWelcomeOpen] = useState<boolean>(() => {
     // show every time; or persist once:
@@ -70,12 +68,6 @@ export default function GameRoot() {
       } catch {}
     }
   }, [welcomeOpen]);
-  useEffect(() => {
-    return () => {
-      if (resetToastRef.current) clearTimeout(resetToastRef.current);
-      if (introToastRef.current) clearTimeout(introToastRef.current);
-    };
-  }, []);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogData, setDialogData] = useState<DialogueData | null>(null);
@@ -360,9 +352,9 @@ export default function GameRoot() {
   // Dev checks (safe to disable if you like)
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
-      runDevChecks(walkable, items);
+      runDevChecks(walkable, items, wallOcc);
     }
-  }, [walkable, items]);
+  }, [walkable, items, wallOcc]);
 
   // flip frames while moving
   useEffect(() => {
@@ -437,31 +429,38 @@ export default function GameRoot() {
   }
 
   const onKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
-    const key = e.key.toLowerCase();
-    let handled = true;
+    if (!audioUnlocked) setAudioUnlocked(true);
 
+    const key = e.key.toLowerCase();
+    if (welcomeOpen) {
+      // only allow Enter (StartScreen listens globally too)
+      if (key === "enter") e.preventDefault();
+      return;
+    }
+    if (helpOpen) {
+      // HelpOverlay intercepts Enter/Esc; ignore movement
+      if (key === "enter" || key === "escape") e.preventDefault();
+      return;
+    }
+
+    let handled = true;
     if (key === "arrowup" || key === "w") startStep("up");
     else if (key === "arrowdown" || key === "s") startStep("down");
     else if (key === "arrowleft" || key === "a") startStep("left");
     else if (key === "arrowright" || key === "d") startStep("right");
     else if (key === "r") {
-      setAnim(null);
       setPos(start);
-      if (resetToastRef.current) clearTimeout(resetToastRef.current);
+      window.clearTimeout((onKeyDown as any)._t);
     } else if (key === "x") {
-      if (activeItem) {
-        // prefer passing the whole item:
-        interactWith(activeItem);
-        // If your signature expects an id, make interactWith accept Item | Item["id"],
-        // or keep this: interactWith(activeItem.id)
-      } else handled = false;
+      if (activeItem) interactWith(activeItem.id);
+      else handled = false;
     } else if (key === "j") {
       setFlags((f) => {
         if (f.shoesOff) return f;
         setDialogOpen(false); // stop yelling if open
-        if (introToastRef.current) clearTimeout(introToastRef.current);
         return { ...f, shoesOff: true, shoesChoiceMade: true };
       });
+      window.clearTimeout((onKeyDown as any)._t2);
     } else handled = false;
 
     if (handled) e.preventDefault();

@@ -1,4 +1,4 @@
-import { Item, Wall } from "./types";
+import { Item } from "./types";
 import { buildItemOcc } from "./utils";
 
 export function runDevChecks(walkable: boolean[][], items: Item[]) {

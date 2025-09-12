@@ -21,8 +21,6 @@ export default function GridFloor({
   pos,
   activeItem,
 }: Props) {
-  const PLAYER_SZ = Math.round(tilePx * 0.5);
-
   return (
     <div
       className="grid gap-0"
@@ -37,7 +35,6 @@ export default function GridFloor({
         const r = Math.floor(i / cols);
         const c = i % cols;
         const isWalkable = walkable[r][c];
-        const isPlayer = pos.r === r && pos.c === c;
 
         const floorStyle: React.CSSProperties | undefined = isWalkable
           ? {

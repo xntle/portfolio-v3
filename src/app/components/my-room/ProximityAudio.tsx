@@ -1,25 +1,16 @@
 "use client";
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { Item } from "../../my-room/game/types";
 
 type Props = {
-  /** e.g. "/audio/ukulele.mp3" */
   src: string;
-  /** tile size (px) */
   tilePx: number;
-  /** the item that emits sound (ukulele) */
   item: Item;
-  /** player's rendered pixel position (x is tile center; y is tile bottom-center) */
   playerXY: { x: number; y: number };
-  /** set true after first key/mouse/touch so autoplay works */
   unlocked: boolean;
-  /** full volume inside this radius (tiles) */
   fullRadiusTiles?: number; // default 1.2
-  /** silent at/after this radius (tiles) */
   maxRadiusTiles?: number; // default 7
-  /** cap volume (0..1) */
   maxVolume?: number; // default 0.6
-  /** smoothness (0..1): higher = slower changes */
   smooth?: number; // default 0.2
 };
 
