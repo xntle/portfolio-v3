@@ -289,9 +289,9 @@ export default function GameRoot() {
     setFlags((f) => {
       const lvl = Math.min(2, f.shoeWarnLevel ?? 0);
       const lines = [
-        "Please take your shoes off. (PRESS J TO TAKE SHOES OFF)",
-        "TAKE YOUR SHOES OFF. (PRESS J TO TAKE SHOES OFF)",
-        "TAKE YOUR F***KING (FRICKING) SHOES OFF. (PRESS J TO TAKE SHOES OFF)",
+        "Please take your shoes off. This is an asian household (PRESS J TO TAKE SHOES OFF)",
+        "TAKE YOUR SHOES OFF. This is an asian household (PRESS J TO TAKE SHOES OFF)",
+        "TAKE YOUR F***KING (FRICKING) SHOES OFF. THIS IS AN ASIAN HOUSEHOLD (PRESS J TO TAKE SHOES OFF)",
       ];
       const portrait = lvl === 0 ? HOST_SPRITES.normal : HOST_SPRITES.furious;
 
