@@ -72,7 +72,7 @@ const Header = () => {
           href="/my-room"
           className="w-28 px-4 py-1 rounded-full bg-[#e5372c] text-white hover:opacity-90  hover:ring-2 hover:ring-offset-2 hover:ring-[#e5372c] transition"
         >
-          DO NOT PRESS
+          My Corner
         </Link>
       </div>
     </section>

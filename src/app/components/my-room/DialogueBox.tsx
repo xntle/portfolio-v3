@@ -32,6 +32,7 @@ export default function DialogueBox({
   const [page, setPage] = useState(0);
   const [shown, setShown] = useState(0);
   const [done, setDone] = useState(false);
+  done;
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   useEffect(() => {

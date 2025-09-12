@@ -8,7 +8,6 @@ type Props = {
   tilePx: number;
   tileSrc: string;
   walkable: boolean[][];
-  pos: Pos;
   activeItem: Item | null;
 };
 
@@ -18,7 +17,6 @@ export default function GridFloor({
   tilePx,
   tileSrc,
   walkable,
-  pos,
   activeItem,
 }: Props) {
   return (
