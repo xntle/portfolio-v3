@@ -11,16 +11,9 @@ type Props = {
   pos: Pos;
   activeItem: Item | null;
 };
+export default function GridFloor(props: Props) {
+  const { rows, cols, tilePx, tileSrc, walkable, activeItem } = props;
 
-export default function GridFloor({
-  rows,
-  cols,
-  tilePx,
-  tileSrc,
-  walkable,
-  pos: _pos,
-  activeItem,
-}: Props) {
   return (
     <div
       className="grid gap-0"
@@ -50,7 +43,6 @@ export default function GridFloor({
             className={"relative " + (isWalkable ? "" : "bg-black")}
             style={{ ...floorStyle, width: tilePx, height: tilePx }}
           >
-            {/* Inline [X] prompt (anchor to item top-left) */}
             {activeItem && activeItem.pos.r === r && activeItem.pos.c === c && (
               <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] px-2 py-0.5 z-90 rounded bg-neutral-800 text-white border border-neutral-700">
                 [X] to interact
