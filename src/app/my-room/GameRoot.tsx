@@ -39,6 +39,10 @@ export default function GameRoot() {
   const items = useMemo<Item[]>(() => ITEMS, []);
   const itemOcc = useMemo(() => buildItemOcc(items), [items]);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const stepTimeoutRef = useRef<number | null>(null);
+  const keydownTimeoutRef = useRef<number | null>(null);
+  const shoesTimeoutRef = useRef<number | null>(null);
+
   //   const [time, setTime] = useState("");
   const [flags, setFlags] = useState<Flags>({
     shoesOff: false,
@@ -155,9 +159,6 @@ export default function GameRoot() {
   }, []);
 
   const [pos, setPos] = useState<Pos>(start);
-  //   const [toast, setToast] = useState<string | null>(
-  //     "Welcome! Press J to take your shoes off. Move with WASD/Arrows."
-  //   );
 
   const focusRef = useRef<HTMLDivElement>(null);
   // tile center -> pixel coords
@@ -290,7 +291,7 @@ export default function GameRoot() {
       const lines = [
         "Please take your shoes off. (PRESS J TO TAKE SHOES OFF)",
         "TAKE YOUR SHOES OFF. (PRESS J TO TAKE SHOES OFF)",
-        "TAKE YOUR F***CKING SHOES OFF. (PRESS J TO TAKE SHOES OFF)",
+        "TAKE YOUR F***KING (FRICKING) SHOES OFF. (PRESS J TO TAKE SHOES OFF)",
       ];
       const portrait = lvl === 0 ? HOST_SPRITES.normal : HOST_SPRITES.furious;
 
@@ -333,7 +334,10 @@ export default function GameRoot() {
       dur: 140,
     }); // tweak speed here
     playFoot(0.2);
-    window.clearTimeout((startStep as any)._half);
+    if (stepTimeoutRef.current !== null) {
+      window.clearTimeout(stepTimeoutRef.current);
+      stepTimeoutRef.current = null;
+    }
   }
 
   useEffect(() => {
@@ -352,9 +356,9 @@ export default function GameRoot() {
   // Dev checks (safe to disable if you like)
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
-      runDevChecks(walkable, items, wallOcc);
+      runDevChecks(walkable, items);
     }
-  }, [walkable, items, wallOcc]);
+  }, [walkable, items]);
 
   // flip frames while moving
   useEffect(() => {
@@ -450,7 +454,10 @@ export default function GameRoot() {
     else if (key === "arrowright" || key === "d") startStep("right");
     else if (key === "r") {
       setPos(start);
-      window.clearTimeout((onKeyDown as any)._t);
+      if (keydownTimeoutRef.current !== null) {
+        window.clearTimeout(keydownTimeoutRef.current);
+        keydownTimeoutRef.current = null;
+      }
     } else if (key === "x") {
       if (activeItem) interactWith(activeItem.id);
       else handled = false;
@@ -460,7 +467,10 @@ export default function GameRoot() {
         setDialogOpen(false); // stop yelling if open
         return { ...f, shoesOff: true, shoesChoiceMade: true };
       });
-      window.clearTimeout((onKeyDown as any)._t2);
+      if (shoesTimeoutRef.current !== null) {
+        window.clearTimeout(shoesTimeoutRef.current);
+        shoesTimeoutRef.current = null;
+      }
     } else handled = false;
 
     if (handled) e.preventDefault();
