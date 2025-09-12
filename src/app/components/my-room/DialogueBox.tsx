@@ -31,8 +31,6 @@ export default function DialogueBox({
   // ----- Hooks (unconditional) -----
   const [page, setPage] = useState(0);
   const [shown, setShown] = useState(0);
-  const [done, setDone] = useState(false);
-  done;
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   useEffect(() => {
@@ -54,7 +52,6 @@ export default function DialogueBox({
     if (!isOpen || !data) return;
     setPage(0);
     setShown(0);
-    setDone(false);
   }, [isOpen, data]);
 
   // typewriter
@@ -86,7 +83,6 @@ export default function DialogueBox({
           setPage((p) => p + 1);
           setShown(0);
         } else {
-          setDone(true);
           onAdvance();
         }
       } else if (e.key === "Escape") {
@@ -119,7 +115,6 @@ export default function DialogueBox({
       setPage((p) => p + 1);
       setShown(0);
     } else {
-      setDone(true);
       onAdvance();
     }
   };
