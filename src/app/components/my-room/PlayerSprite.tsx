@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import { PLAYER_SPRITES } from "../../my-room/game/sprites";
+import Image from "next/image";
 
 export type Dir = "down" | "up" | "right" | "left";
 
@@ -30,21 +31,21 @@ export default function PlayerSprite({
   const h = 1.5 * tilePx;
 
   return (
-    <img
+    <Image
       alt="player"
       src={src}
+      width={Math.round(w)}
+      height={Math.round(h)}
       style={{
         position: "absolute",
         left: x,
         top: y,
-        width: w,
-        height: h,
         imageRendering: "pixelated",
-        // place the *bottom-center* of the 2×2 sprite on the tile center:
-        transform: `translate(-50%, -100%) ${flipX ? "scaleX(-1)" : ""}`,
+        transform: `translate(-50%, -100%)${flipX ? " scaleX(-1)" : ""}`,
         zIndex: z,
         pointerEvents: "none",
       }}
+      draggable={false}
     />
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 
 export type DialogueData = {
   title: string;
@@ -130,15 +131,13 @@ export default function DialogueBox({
           {data.title}
         </div>
         <div className="flex gap-3 p-3 pb-2 items-start">
-          <img
+          <Image
             src={data.portraitSrc}
             alt="portrait"
-            style={{
-              width: portraitSize,
-              height: portraitSize,
-              imageRendering: "pixelated",
-            }}
+            width={portraitSize}
+            height={portraitSize}
             className="shrink-0 rounded-md bg-black/20 object-contain"
+            style={{ imageRendering: "pixelated" }}
           />
           <div
             className="relative grow text-neutral-100 leading-6"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 
 const fishImages = ["/4.png", "/2.png", "/3.png", "/5.png"];
 
@@ -21,8 +22,7 @@ export default function FishTank() {
   });
 
   useEffect(() => {
-
-    const isMobile = window.innerWidth <= 640; 
+    const isMobile = window.innerWidth <= 640;
     setDimensions({
       width: isMobile ? 320 : 570,
       height: isMobile ? 475 : 550,
@@ -130,17 +130,15 @@ export default function FishTank() {
         }}
       >
         {fishes.map((fish, i) => (
-          <img
+          <Image
             key={i}
             src={fishImages[i % fishImages.length]}
             alt={`fish-${i}`}
+            width={Math.round(dimensions.fishSize)}
+            height={Math.round(dimensions.fishSize)}
             className="absolute pointer-events-none rounded-full animate-[spin_8s_linear_infinite]"
-            style={{
-              width: dimensions.fishSize,
-              height: dimensions.fishSize,
-              top: fish.top,
-              left: fish.left,
-            }}
+            style={{ top: fish.top, left: fish.left }}
+            draggable={false}
           />
         ))}
       </div>

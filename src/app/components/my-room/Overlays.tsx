@@ -7,6 +7,7 @@ import {
   placeholderDataUri,
 } from "../../my-room/game/sprites";
 import { isAdjacentToItem } from "../../my-room/game/utils";
+import Image from "next/image";
 
 type Props = {
   tilePx: number;
@@ -32,18 +33,19 @@ export default function Overlays({
             WALL_SPRITES[w.id] ??
             placeholderDataUri(w.placeholderLabel, tilePx);
           return (
-            <img
+            <Image
               key={w.id}
               alt={w.name}
               src={src}
+              width={Math.round(w.size.w * tilePx)}
+              height={Math.round(w.size.h * tilePx)}
               style={{
                 position: "absolute",
                 left: w.pos.c * tilePx,
                 top: w.pos.r * tilePx,
-                width: w.size.w * tilePx,
-                height: w.size.h * tilePx,
                 imageRendering: "pixelated",
               }}
+              className="pointer-events-none select-none"
             />
           );
         })}
@@ -60,21 +62,23 @@ export default function Overlays({
           const isActive =
             activeItem?.id === it.id && isAdjacentToItem(pos, it);
           return (
-            <img
+            <Image
               key={it.id}
               alt={it.name}
               src={src}
+              width={Math.round(w * tilePx)}
+              height={Math.round(h * tilePx)}
               style={{
                 position: "absolute",
                 left: it.pos.c * tilePx,
                 top: it.pos.r * tilePx,
-                width: w * tilePx,
-                height: h * tilePx,
                 imageRendering: "pixelated",
                 filter: isActive
                   ? "drop-shadow(0 0 8px rgba(255,255,255,0.6))"
                   : undefined,
               }}
+              className="pointer-events-none select-none"
+              draggable={false}
             />
           );
         })}

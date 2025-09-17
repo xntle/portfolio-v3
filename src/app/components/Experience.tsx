@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import Image from "next/image";
 
 export default function Experience() {
   const [openSet, setOpenSet] = useState<Set<number>>(new Set());
@@ -12,7 +13,8 @@ export default function Experience() {
       company: "Aggieworks",
       image: "/aw.jpeg",
       duration: "Oct 2024 - current",
-      summary: "Working on clubly.org, building an internal tool for UC Davis student organizations.",
+      summary:
+        "Working on clubly.org, building an internal tool for UC Davis student organizations.",
       bullets: [
         "Built and iterated on the admin panel for clubly.org, enabling easier club onboarding and management, helping 12,000+ UC Davis students discover and connect with 600+ campus organizations",
         "Collaborated with fellow engineers using GitHub and Agile workflows to deliver features on a tight timeline.",
@@ -24,11 +26,9 @@ export default function Experience() {
         "Drizzle ORM",
         "Hono",
         "R2/AWS",
-        "TailwindCSS"
+        "TailwindCSS",
       ],
-      projects: [
-        { name: "clubly", url: "https://clubly.org" },
-      ],
+      projects: [{ name: "clubly", url: "https://clubly.org" }],
     },
     {
       role: "Software Engineer Fellow",
@@ -158,9 +158,11 @@ export default function Experience() {
                   {/* Left: Logo + Company/Role */}
                   <div className="flex items-center space-x-4">
                     {/* Logo */}
-                    <img
+                    <Image
                       src={exp.image}
                       alt={`${exp.company} logo`}
+                      width={40}
+                      height={40}
                       className="w-10 h-10 rounded-full object-cover"
                     />
 
