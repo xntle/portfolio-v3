@@ -33,19 +33,18 @@ export default function Overlays({
             WALL_SPRITES[w.id] ??
             placeholderDataUri(w.placeholderLabel, tilePx);
           return (
-            <Image
+            <img
               key={w.id}
               alt={w.name}
               src={src}
-              width={Math.round(w.size.w * tilePx)}
-              height={Math.round(w.size.h * tilePx)}
               style={{
                 position: "absolute",
                 left: w.pos.c * tilePx,
                 top: w.pos.r * tilePx,
+                width: w.size.w * tilePx,
+                height: w.size.h * tilePx,
                 imageRendering: "pixelated",
               }}
-              className="pointer-events-none select-none"
             />
           );
         })}
