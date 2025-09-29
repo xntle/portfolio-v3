@@ -122,7 +122,6 @@ export default function GameRoot() {
       "I can’t run on fumes forever. Hustle feels good in the moment, but my liver is probably cooked.",
       "That’s why I only do it when necessary and lean on consistent effort instead... I’m much happier this way.",
     ],
-
     clock: [
       "TIME IS RUNNING OUT, DO THAT THING YOU ALWAYS WANTED TO DO AND DIDN'T HAVE THE CHANCE TO!",
     ],
@@ -133,8 +132,9 @@ export default function GameRoot() {
     ],
     mat: ["temu 8 ball mat", "strangely comfortable, great to nap on"],
     desk: [
-      "did you know?: my first CS project was a pixel art game for the AP Computer Science Principles Create Task back in 2019",
-      "This started my love of building and inspired me to come to college for computer science!",
+      "my first CS project was a pixel art game for the AP Computer Science Principles Create Task back in 2019",
+      "It was the funnest AP exam I've ever taken, and ultimately, I realized I love building",
+      "Everytime I get discoraged, I look back to where this all started and undoubtfully I know I made the right decision in my career choice.",
     ],
   };
 
