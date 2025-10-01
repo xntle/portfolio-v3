@@ -143,7 +143,7 @@ export default function DialogueBox({
             className="relative grow text-neutral-100 leading-6"
             style={{ minHeight: portraitSize - 8 }}
           >
-            <p className="whitespace-pre-wrap text-[15px] pr-14">
+            <p className="whitespace-pre-wrap text-lg pr-14">
               {visible}
               {shown < total && <span className="opacity-60">▌</span>}
             </p>
