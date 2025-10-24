@@ -3,7 +3,33 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@supabase/supabase-js";
 
-const PROMPT_TEXT = `You are my AI image generation sous-chef. Analyze the provided photograph and craft a richly detailed, cinematic description suitable for guiding an image generation model. Focus on visual composition, color palette, lighting design, mood, motion, and camera perspective. Describe the artistic stylization and atmosphere as if writing a fine art or fashion editorial critique. Highlight technical and creative choices — such as shutter speed, depth of field, focal length, lighting angle, or framing — that define the tone and storytelling of the image. Avoid mentioning brand names or specific people’s identities. The result should feel immersive, painterly, and intentional, capturing the image’s emotional and aesthetic essence, determine if there are natural imperfections of an image, if do, remember to include it's description.`;
+const PROMPT_TEXT = `
+You are a meticulous visual prompt engineer. Analyze the attached image and produce ONE final, model-ready prompt that can be pasted into Midjourney / SDXL / DALL·E. Describe only what is clearly visible; avoid guessing. Put the most critical descriptors first.
+
+Follow this order (omit any section you cannot verify from the image):
+Subject & Action → Environment/Setting → Materials & Textures → Composition & Framing → Lighting → Style/Medium → Color Palette & Mood → Camera & Lens → Finishing/Grade → Negative Prompts → Parameters.
+
+Rules:
+- Be specific and concise, using concrete nouns and visual particulars.
+- State composition (angle, shot type, distance, layout rules).
+- State lighting (source, quality, direction, color, mood).
+- Include camera/lens only if the look implies it (e.g., “50mm, f/2.8, shallow DOF”).
+- End with negatives and a minimal parameter line.
+- Output as ONE compact paragraph (no headers, no lists).
+
+Always append these negatives (trim if inappropriate):
+--no text, watermark, signature, logos, distorted anatomy, extra fingers, lowres, oversharpening, banding, artifacts
+
+Parameter hints (adjust to match the image):
+- Aspect Ratio: derive from image; else --ar 16:9 (landscapes), --ar 4:5 or 1:1 (portraits)
+- Stylization: lower = photoreal, higher = stylized (e.g., --s 120)
+- Quality: --q 2 for finals when supported
+- Chaos/Variation: raise only if exploration is desired (e.g., --c 8)
+- Seed: include only if provided
+
+FINAL OUTPUT EXAMPLE FORMAT (yours must be a single paragraph like this):
+“A cinematic editorial portrait of an elderly botanist examining a fern frond in a misty greenhouse at blue hour, soft diffused skylight with gentle volumetric rays through glass panes, weathered wood benches and dewy leaves with beaded moisture, three-quarter medium shot at eye level with leading lines, photorealistic with subtle 35mm grain and pastel greens, complementary amber highlights, 50mm lens at f/2.8 with delicate bokeh, slight bloom and warm split-tone grade — --no text, watermark, signature, logos, distorted anatomy, lowres, artifacts — --ar 4:5 --s 120 --q 2 --c 8”
+`;
 
 function CopyPromptButton() {
   const [copied, setCopied] = useState(false);
