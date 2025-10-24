@@ -3,6 +3,30 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@supabase/supabase-js";
 
+const PROMPT_TEXT = `You are my AI image generation sous-chef. Analyze the provided photograph and craft a richly detailed, cinematic description suitable for guiding an image generation model. Focus on visual composition, color palette, lighting design, mood, motion, and camera perspective. Describe the artistic stylization and atmosphere as if writing a fine art or fashion editorial critique. Highlight technical and creative choices — such as shutter speed, depth of field, focal length, lighting angle, or framing — that define the tone and storytelling of the image. Avoid mentioning brand names or specific people’s identities. The result should feel immersive, painterly, and intentional, capturing the image’s emotional and aesthetic essence, determine if there are natural imperfections of an image, if do, remember to include it's description.`;
+
+function CopyPromptButton() {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    await navigator.clipboard.writeText(PROMPT_TEXT);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1200);
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      aria-label="Copy prompt to clipboard"
+      title="Copy prompt"
+      className="rounded-md border border-white/30 bg-white/15 px-3 py-2 text-sm text-white hover:bg-white/25"
+    >
+      {copied ? "Copied!" : "Copy prompt"}
+    </button>
+  );
+}
+
 // Types
 interface Item {
   id: string;
@@ -724,10 +748,11 @@ function FullscreenForm({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
+            <CopyPromptButton />
 
             {/* BIG image input (drop area) */}
             <div className="sm:col-span-4">
-              <label className="relative block h-44 w-full cursor-pointer rounded-xl border border-dashed border-white/30 bg-white/15 backdrop-blur hover:bg-white/20 transition">
+              <label className="relative block h-26 w-full cursor-pointer rounded-xl border border-dashed border-white/30 bg-white/15 backdrop-blur hover:bg-white/20 transition">
                 <input
                   type="file"
                   accept="image/*"
