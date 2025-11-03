@@ -128,10 +128,10 @@ export default function TermsPage() {
           <br />
           Email:{" "}
           <a
-            href="mailto:legal@fitcheck.app"
+            href="mailto:thaianle.work@gmail.com"
             className="text-blue-600 underline"
           >
-            legal@fitcheck.app
+            thaianle.work@gmail.com
           </a>
         </p>
       </section>

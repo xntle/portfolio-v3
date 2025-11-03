@@ -111,7 +111,7 @@ export default function PrivacyPage() {
           <br />
           Email:{" "}
           <a
-            href="mailto:privacy@fitcheck.app"
+            href="mailto:thaianle.work@gmail.com"
             className="text-blue-600 underline"
           >
             thaianle.work@gmail.com
