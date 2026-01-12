@@ -10,7 +10,7 @@ export default function About() {
         <p className=" text-sm  mt-2">
           <b>Other Hobbies:</b> Video Editing, Cool ChatGPT Prompts, 3D-Modeling, Streaming, Badminton
         </p>
-        <div className=" text-sm mt-4 flex space-x-4 text-blue-500 underline">
+        <div className=" text-sm mt-4 flex space-x-4 text-blue-500 dark:text-blue-400 underline">
         <a
   className="flex gap-2"
   href="https://drive.google.com/drive/folders/12cTsJccyvpVwrejRO2R2o7JuhABW4uVC?usp=sharing"

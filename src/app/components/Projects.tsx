@@ -77,14 +77,13 @@ const projects: Project[] = [
 export default function Projects() {
   return (
     <>
-
       <section id="projects">
         <h2 className="text-xl font-bold mb-6">projects</h2>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           {projects.map((project, index) => (
             <div
               key={index}
-              className="rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition duration-300 bg-white"
+              className="rounded-xl border border-gray-200 dark:border-zinc-800 shadow-sm hover:shadow-md transition duration-300 bg-white dark:bg-zinc-900"
             >
               {project.image && (
                 <Image
@@ -107,62 +106,66 @@ export default function Projects() {
                   playsInline
                 />
               )}
-          <div className="p-4">
-              <h3 className="text-lg font-semibold">{project.title}</h3>
-              <p className="text-xs text-gray-500">{project.dates}</p>
+              <div className="p-4">
+                <h3 className="text-lg font-semibold dark:text-zinc-100">
+                  {project.title}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-zinc-400">
+                  {project.dates}
+                </p>
 
-              <p className="mt-2 text-sm text-gray-700">
-                {project.description}
-              </p>
+                <p className="mt-2 text-sm text-gray-700 dark:text-zinc-300">
+                  {project.description}
+                </p>
 
-              <div className="flex flex-wrap gap-1 mt-3">
-                {project.tags.map((tag, i) => (
-                  <span
-                    key={i}
-                    className="bg-gray-100 text-xs text-gray-800 px-2 py-1 rounded-full"
-                  >
-                    {tag}
-                  </span>
-                ))}
+                <div className="flex flex-wrap gap-1 mt-3">
+                  {project.tags.map((tag, i) => (
+                    <span
+                      key={i}
+                      className="bg-gray-100 text-xs text-gray-800 dark:bg-zinc-800 dark:text-zinc-200 px-2 py-1 rounded-full"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="flex gap-2 mt-4 text-xs">
+                  {project.demo && (
+                    <a
+                      href={project.demo}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 px-2 py-1 border dark:border-zinc-700 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 transition dark:text-zinc-300"
+                    >
+                      <FaYoutube className="text-sm" /> Demo
+                    </a>
+                  )}
+                  {project.website && (
+                    <a
+                      href={project.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 px-2 py-1 border dark:border-zinc-700 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 transition dark:text-zinc-300"
+                    >
+                      <FaGlobe className="text-sm" /> Website
+                    </a>
+                  )}
+                  {project.source && (
+                    <a
+                      href={project.source}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 px-2 py-1 border dark:border-zinc-700 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 transition dark:text-zinc-300"
+                    >
+                      <FaGithub className="text-sm" /> Source
+                    </a>
+                  )}
+                </div>
               </div>
-
-              <div className="flex gap-2 mt-4 text-xs">
-                {project.demo && (
-                  <a
-                    href={project.demo}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 px-2 py-1 border rounded-full hover:bg-gray-100 transition"
-                  >
-                    <FaYoutube className="text-sm" /> Demo
-                  </a>
-                )}
-                {project.website && (
-                  <a
-                    href={project.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 px-2 py-1 border rounded-full hover:bg-gray-100 transition"
-                  >
-                    <FaGlobe className="text-sm" /> Website
-                  </a>
-                )}
-                {project.source && (
-                  <a
-                    href={project.source}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 px-2 py-1 border rounded-full hover:bg-gray-100 transition"
-                  >
-                    <FaGithub className="text-sm" /> Source
-                  </a>
-                )}
-              </div>
-            </div>
             </div>
           ))}
         </div>
-        </section>
+      </section>
     </>
   );
 }

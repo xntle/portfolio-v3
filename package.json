@@ -28,6 +28,7 @@
     "react-draggable": "^4.4.6",
     "react-icons": "^5.5.0",
     "supabase": "^2.33.9",
+    "tailwindcss-animate": "^1.0.7",
     "three": "^0.174.0"
   },
   "devDependencies": {

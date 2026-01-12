@@ -1,8 +1,35 @@
 @import "tailwindcss";
+/* @plugin "tailwindcss-animate"; */
+@custom-variant dark (&:is(.dark *));
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@theme {
+  --color-black: #000000;
+  --color-red: #e5372c;
+  
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+  --animate-spin-360: rotate-360 6s linear infinite;
+
+  @keyframes rotate-360 {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+}
+
+/*
+  The default border color has changed to `currentColor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+}
 
 html,
 body {

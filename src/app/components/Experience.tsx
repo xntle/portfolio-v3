@@ -9,6 +9,21 @@ export default function Experience() {
 
   const experiences = [
     {
+      role: "Contract Software Engineer",
+      company: "Shopify",
+      image: "/shopify.png",
+      duration: "Aug 2025 - Present",
+      summary:
+        "Built Shop Mini 'Fit Check' - Clothes Recommendations and AI Try On.",
+      bullets: [
+        "Developed 'Fit Check', a Shop Mini app providing personalized clothes recommendations.",
+        "Implemented AI Try-On features enabling users to visualize clothing items virtually.",
+        "Integrated AI algorithms to analyze user preferences and suggest relevant fashion items.",
+      ],
+      tech: ["React", "Shop Mini SDK"],
+      projects: [],
+    },
+    {
       role: "Software Engineer",
       company: "Aggieworks",
       image: "/aw.jpeg",
@@ -147,7 +162,7 @@ export default function Experience() {
           return (
             <div
               key={i}
-              className="border-b border-gray-300 pb-4 transition-all duration-300 animate-fadeIn "
+              className="border-b border-gray-300 dark:border-zinc-800 pb-4 transition-all duration-300 animate-fadeIn "
             >
               <button
                 onClick={() => toggle(i)}
@@ -179,12 +194,14 @@ export default function Experience() {
                         </span>
                       </div>
 
-                      <p className="text-sm text-gray-600">{exp.role}</p>
+                      <p className="text-sm text-gray-600 dark:text-zinc-400">
+                        {exp.role}
+                      </p>
                     </div>
                   </div>
 
                   {/* Right: Duration */}
-                  <div className="text-sm text-gray-500 whitespace-nowrap mt-1">
+                  <div className="text-sm text-gray-500 dark:text-zinc-500 whitespace-nowrap mt-1">
                     {exp.duration}
                   </div>
                 </div>
@@ -196,7 +213,7 @@ export default function Experience() {
                   {exp.tech.map((tag, index) => (
                     <span
                       key={index}
-                      className="bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full text-xs"
+                      className="bg-gray-100 text-gray-800 dark:bg-zinc-800 dark:text-zinc-200 px-2 py-0.5 rounded-full text-xs"
                     >
                       {tag}
                     </span>
@@ -211,7 +228,7 @@ export default function Experience() {
                     : "max-h-0 opacity-0"
                 }`}
               >
-                <ul className="list-disc pl-6 text-sm text-gray-700 space-y-1">
+                <ul className="list-disc pl-6 text-sm text-gray-700 dark:text-zinc-300 space-y-1">
                   {exp.bullets.map((point, idx) => (
                     <li key={idx}>{point}</li>
                   ))}
@@ -223,7 +240,7 @@ export default function Experience() {
                       href={proj.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 underline hover:text-blue-800 transition-colors"
+                      className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
                     >
                       {proj.name}
                     </a>
