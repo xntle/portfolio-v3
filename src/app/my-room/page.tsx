@@ -64,6 +64,5 @@ function MobileBlocker() {
 }
 
 export default function Page() {
-  const isMobile = useIsMobile();
-  return isMobile ? <MobileBlocker /> : <GameRoot />;
+  return <GameRoot />;
 }

@@ -32,6 +32,14 @@ export default function DialogueBox({
   // ----- Hooks (unconditional) -----
   const [page, setPage] = useState(0);
   const [shown, setShown] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   useEffect(() => {
@@ -54,6 +62,14 @@ export default function DialogueBox({
     setPage(0);
     setShown(0);
   }, [isOpen, data]);
+
+  useEffect(() => {
+    console.log("[DialogueBox] isOpen:", isOpen);
+    if (!isOpen) {
+      audioRef.current?.pause();
+      if (audioRef.current) audioRef.current.currentTime = 0;
+    }
+  }, [isOpen]);
 
   // typewriter
   useEffect(() => {
@@ -100,14 +116,21 @@ export default function DialogueBox({
   if (!isOpen || !data) return null;
 
   // ----- Render-only values -----
-  const portraitSize = Math.round(tilePx * 3);
+  const portraitSize = isMobile
+    ? Math.round(tilePx * 1.8)
+    : Math.round(tilePx * 3);
   const visible = text.slice(0, shown); // no useMemo needed
-  const indicator =
-    shown < total
-      ? "Press Enter to skip"
+  const indicator = isMobile
+    ? shown < total
+      ? "Tap to skip"
       : page < data.lines.length - 1
-      ? "Press Enter to continue"
-      : "Press Enter to finish";
+      ? "Tap to continue"
+      : "Tap to finish"
+    : shown < total
+    ? "Press Enter to skip"
+    : page < data.lines.length - 1
+    ? "Press Enter to continue"
+    : "Press Enter to finish";
 
   const onClickBox = () => {
     if (!allowClick) return;
@@ -121,34 +144,53 @@ export default function DialogueBox({
   };
 
   return (
+    // Backdrop / Click Capture Area
     <div
-      className="absolute left-1/2 bottom-0 -translate-x-1/2 pointer-events-auto"
-      style={{ width: widthPx, zIndex: 90 }}
+      className={
+        isMobile
+          ? "fixed inset-0 z-[90] outline-none cursor-pointer"
+          : "absolute inset-0 z-[90] outline-none cursor-pointer"
+      }
       onClick={onClickBox}
     >
-      <div className="mx-auto mb-2 rounded-xl border border-sky-300/40 bg-neutral-900/80 shadow-xl backdrop-blur-sm overflow-hidden">
-        <div className="px-3 py-1.5 bg-sky-700/40 text-sky-100 text-sm font-semibold tracking-wide">
-          {data.title}
-        </div>
-        <div className="flex gap-3 p-3 pb-2 items-start">
-          <Image
-            src={data.portraitSrc}
-            alt="portrait"
-            width={portraitSize}
-            height={portraitSize}
-            className="shrink-0 rounded-md bg-black/20 object-contain"
-            style={{ imageRendering: "pixelated" }}
-          />
-          <div
-            className="relative grow text-neutral-100 leading-6"
-            style={{ minHeight: portraitSize - 8 }}
-          >
-            <p className="whitespace-pre-wrap text-lg pr-14">
-              {visible}
-              {shown < total && <span className="opacity-60">▌</span>}
-            </p>
-            <div className="absolute right-1 bottom-1 text-xs text-neutral-300/80">
-              {indicator} {allowClick && "(or click)"}
+      {/* Visual Box */}
+      <div
+        className={`absolute left-1/2 -translate-x-1/2 pointer-events-auto ${
+          isMobile ? "top-20" : "bottom-0"
+        }`}
+        style={{
+          width: widthPx,
+          maxWidth: "95vw",
+        }}
+      >
+        <div className="mx-auto mb-2 rounded-xl border border-sky-300/40 bg-neutral-900/80 shadow-xl backdrop-blur-sm overflow-hidden">
+          <div className="px-3 py-1.5 bg-sky-700/40 text-sky-100 text-sm font-semibold tracking-wide">
+            {data.title}
+          </div>
+          <div className="flex gap-3 p-3 pb-2 items-start">
+            <Image
+              src={data.portraitSrc}
+              alt="portrait"
+              width={portraitSize}
+              height={portraitSize}
+              className="shrink-0 rounded-md bg-black/20 object-contain"
+              style={{ imageRendering: "pixelated" }}
+            />
+            <div
+              className="relative grow text-neutral-100 leading-6"
+              style={{ minHeight: portraitSize - 8 }}
+            >
+              <p
+                className={`whitespace-pre-wrap ${
+                  isMobile ? "text-sm" : "text-lg"
+                } pr-14`}
+              >
+                {visible}
+                {shown < total && <span className="opacity-60">▌</span>}
+              </p>
+              <div className="absolute right-1 bottom-1 text-xs text-neutral-300/80">
+                {indicator} {!isMobile && allowClick && "(or click)"}
+              </div>
             </div>
           </div>
         </div>

@@ -5,9 +5,15 @@ type Props = {
   isOpen: boolean;
   widthPx: number; // usually COLS * TILE_PX
   onStart: () => void; // called when Enter/click
+  isMobile?: boolean;
 };
 
-export default function StartScreen({ isOpen, widthPx, onStart }: Props) {
+export default function StartScreen({
+  isOpen,
+  widthPx,
+  onStart,
+  isMobile = false,
+}: Props) {
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -24,8 +30,8 @@ export default function StartScreen({ isOpen, widthPx, onStart }: Props) {
 
   return (
     <div
-      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto"
-      style={{ width: Math.min(widthPx, 720), zIndex: 100 }}
+      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto w-full px-4 md:px-0"
+      style={{ maxWidth: Math.min(widthPx, 720), zIndex: 100 }}
     >
       <div className="rounded-2xl border border-sky-400/40 bg-neutral-900/90 shadow-2xl backdrop-blur-sm overflow-hidden">
         <div className="px-5 py-3 bg-sky-700/40 text-sky-100 font-semibold tracking-wide">
@@ -40,23 +46,39 @@ export default function StartScreen({ isOpen, widthPx, onStart }: Props) {
 
           <div className="mt-2 text-sm border border-neutral-700/60 rounded-lg p-3 bg-neutral-800/40">
             <div className="font-semibold mb-1 text-neutral-200">Controls</div>
-            <ul className="grid grid-cols-2 gap-y-1 text-neutral-300">
-              <li>
-                Move: <span className="font-medium">WASD / Arrows</span>
-              </li>
-              <li>
-                Interact: <span className="font-medium">X</span>
-              </li>
-              <li>
-                Shoes: <span className="font-medium">J</span>
-              </li>
-              <li>
-                Reset to Entrance: <span className="font-medium">R</span>
-              </li>
-            </ul>
+            {isMobile ? (
+              <ul className="grid grid-cols-1 gap-y-1 text-neutral-300">
+                <li>
+                  Move: <span className="font-medium">Joystick (Right)</span>
+                </li>
+                <li>
+                  Interact:{" "}
+                  <span className="font-medium">Tap Buttons (Left)</span>
+                </li>
+                <li className="text-xs text-neutral-400 mt-1">
+                  (Buttons appear when actions are available)
+                </li>
+              </ul>
+            ) : (
+              <ul className="grid grid-cols-2 gap-y-1 text-neutral-300">
+                <li>
+                  Move: <span className="font-medium">WASD / Arrows</span>
+                </li>
+                <li>
+                  Interact: <span className="font-medium">X</span>
+                </li>
+                <li>
+                  Shoes: <span className="font-medium">J</span>
+                </li>
+                <li>
+                  Reset to Entrance: <span className="font-medium">R</span>
+                </li>
+              </ul>
+            )}
             <div className="mt-2 text-xs text-neutral-400">
-              Press <span className="font-semibold text-neutral-200">?</span>{" "}
-              anytime for the rules.
+              {isMobile ? "Tap" : "Press"}{" "}
+              <span className="font-semibold text-neutral-200">?</span> anytime
+              for the rules.
             </div>
           </div>
 
@@ -64,7 +86,7 @@ export default function StartScreen({ isOpen, widthPx, onStart }: Props) {
             onClick={onStart}
             className="mt-3 inline-flex items-center justify-center px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold transition"
           >
-            Press Enter (or click) to start
+            {isMobile ? "Tap to start" : "Press Enter (or click) to start"}
           </button>
         </div>
       </div>

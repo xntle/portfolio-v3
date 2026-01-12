@@ -29,6 +29,7 @@ import StartScreen from "../components/my-room/StartScreen";
 import HelpOverlay from "../components/my-room/HelpOverlay";
 import HelpButton from "../components/my-room/HelpButton";
 import BackButton from "../components/my-room/BackButton";
+import MobileControls from "../components/my-room/MobileControls";
 
 // helper: tile center in pixels, we anchor sprite bottom-center there
 
@@ -285,13 +286,26 @@ export default function GameRoot() {
     !blockedByItem(r, c) &&
     !blockedByWall(r, c);
 
+  const [inputLocked, setInputLocked] = useState(false);
+  const overlayOpen = dialogOpen || welcomeOpen || helpOpen;
+
+  // Add safety delay after closing overlays to prevent accidental movement/loops
+  useEffect(() => {
+    if (!overlayOpen) {
+      setInputLocked(true);
+      const t = setTimeout(() => setInputLocked(false), 1000);
+      return () => clearTimeout(t);
+    }
+  }, [overlayOpen]);
+
   function yellShoes() {
+    console.log("[GameRoot] yellShoes triggered");
     setFlags((f) => {
       const lvl = Math.min(2, f.shoeWarnLevel ?? 0);
       const lines = [
-        "Please take your shoes off. This is an asian household (PRESS J TO TAKE SHOES OFF)",
-        "TAKE YOUR SHOES OFF. This is an asian household (PRESS J TO TAKE SHOES OFF)",
-        "TAKE YOUR F***KING (FRICKING) SHOES OFF. THIS IS AN ASIAN HOUSEHOLD (PRESS J TO TAKE SHOES OFF)",
+        "Please take your shoes off. This is an asian household.",
+        "TAKE YOUR SHOES OFF. This is an asian household.",
+        "TAKE YOUR F***KING (FRICKING) SHOES OFF. THIS IS AN ASIAN HOUSEHOLD.",
       ];
       const portrait = lvl === 0 ? HOST_SPRITES.normal : HOST_SPRITES.furious;
 
@@ -302,11 +316,23 @@ export default function GameRoot() {
       });
       setDialogOpen(true);
 
-      return { ...f, shoeWarnLevel: Math.min(2, lvl + 1) };
+      // Auto-resolve if user persists too much (prevent infinite stuck loop)
+      const isMax = lvl >= 2;
+
+      return {
+        ...f,
+        shoeWarnLevel: Math.min(2, lvl + 1),
+        shoesOff: isMax ? true : f.shoesOff,
+        shoesChoiceMade: isMax ? true : f.shoesChoiceMade,
+      };
     });
   }
 
   function startStep(d: Dir) {
+    if (inputLocked) {
+      console.log("[GameRoot] startStep ignored (inputLocked)");
+      return;
+    }
     setDir(d);
     if (anim) {
       queuedDirRef.current = d;
@@ -316,10 +342,13 @@ export default function GameRoot() {
     const from = pos;
     const to = { r: pos.r + dr, c: pos.c + dc };
 
+    console.log("[GameRoot] startStep", d, "from", from, "to", to);
+
     const r2 = pos.r + dr,
       c2 = pos.c + dc;
 
     if (blocksShoesRule(from, to)) {
+      console.log("[GameRoot] Blocked by Shoes Rule");
       yellShoes();
       return;
     }
@@ -432,6 +461,22 @@ export default function GameRoot() {
     setDialogOpen(true);
   }
 
+  function handleInteract() {
+    if (activeItem) interactWith(activeItem.id);
+  }
+
+  function handleShoes() {
+    setFlags((f) => {
+      if (f.shoesOff) return f;
+      setDialogOpen(false); // stop yelling if open
+      return { ...f, shoesOff: true, shoesChoiceMade: true };
+    });
+    if (shoesTimeoutRef.current !== null) {
+      window.clearTimeout(shoesTimeoutRef.current);
+      shoesTimeoutRef.current = null;
+    }
+  }
+
   const onKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
     if (!audioUnlocked) setAudioUnlocked(true);
 
@@ -459,25 +504,76 @@ export default function GameRoot() {
         keydownTimeoutRef.current = null;
       }
     } else if (key === "x") {
-      if (activeItem) interactWith(activeItem.id);
-      else handled = false;
+      handleInteract();
     } else if (key === "j") {
-      setFlags((f) => {
-        if (f.shoesOff) return f;
-        setDialogOpen(false); // stop yelling if open
-        return { ...f, shoesOff: true, shoesChoiceMade: true };
-      });
-      if (shoesTimeoutRef.current !== null) {
-        window.clearTimeout(shoesTimeoutRef.current);
-        shoesTimeoutRef.current = null;
-      }
+      handleShoes();
     } else handled = false;
 
     if (handled) e.preventDefault();
   };
 
+  const [winSize, setWinSize] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const handleResize = () =>
+      setWinSize({ w: window.innerWidth, h: window.innerHeight });
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const isMobile = winSize.w < 768 && winSize.w > 0;
+  // Mobile zoom scale (0.85 = slightly zoomed out from 1.0 but zoomed in relative to fitting the whole board)
+  const mobileScale = 0.85;
+
+  // Camera logic: calculate translate X/Y to center player on mobile
+  const cameraStyle = useMemo(() => {
+    if (!isMobile) return {}; // Desktop: use default layout
+
+    // Center player on screen
+    // Board coord of player center = renderXY.x, renderXY.y
+    // Screen center = winSize.w / 2, winSize.h / 2
+    // We want: (renderXY.x * scale) + translateX = winSize.w / 2
+    // => translateX = winSize.w / 2 - renderXY.x * scale
+
+    const tx = winSize.w / 2 - renderXY.x * mobileScale;
+    const ty = winSize.h / 2 - renderXY.y * mobileScale;
+
+    // Optional: Clamp so we don't see black void past edges?
+    // Board dimensions in scaled px
+    const boardW = COLS * TILE_PX * mobileScale;
+    const boardH = ROWS * TILE_PX * mobileScale;
+
+    // Clamp X
+    // Max tx is 0 (left edge aligned)
+    // Min tx is winSize.w - boardW (right edge aligned)
+    // If board is smaller than screen, center it? (winSize.w - boardW)/2
+    let finalTx = tx;
+    if (boardW > winSize.w) {
+      finalTx = Math.min(0, Math.max(winSize.w - boardW, tx));
+    } else {
+      finalTx = (winSize.w - boardW) / 2;
+    }
+
+    // Clamp Y
+    let finalTy = ty;
+    if (boardH > winSize.h) {
+      finalTy = Math.min(0, Math.max(winSize.h - boardH, ty));
+    } else {
+      finalTy = (winSize.h - boardH) / 2;
+    }
+
+    return {
+      transform: `translate3d(${finalTx}px, ${finalTy}px, 0) scale(${mobileScale})`,
+      transformOrigin: "0 0",
+    };
+  }, [isMobile, winSize, renderXY]);
+
   return (
-    <div className="min-h-dvh w-full bg-black flex items-center justify-center">
+    <div
+      className={`min-h-dvh w-full bg-black flex ${
+        isMobile ? "block" : "items-center justify-center"
+      } overflow-hidden`}
+    >
       <div
         ref={focusRef}
         tabIndex={0}
@@ -488,8 +584,12 @@ export default function GameRoot() {
       >
         {/* One wrapper that sets board size; overlays anchor to this */}
         <div
-          className="relative"
-          style={{ width: COLS * TILE_PX, height: ROWS * TILE_PX }}
+          className="relative transition-transform duration-75 ease-linear will-change-transform"
+          style={{
+            width: COLS * TILE_PX,
+            height: ROWS * TILE_PX,
+            ...cameraStyle,
+          }}
         >
           <GridFloor
             rows={ROWS}
@@ -516,14 +616,24 @@ export default function GameRoot() {
             dir={dir}
             frameIndex={frameIndex}
           />
-          <DialogueBox
-            isOpen={dialogOpen}
-            data={dialogData}
-            onAdvance={() => setDialogOpen(false)} // all lines done → close
-            onClose={() => setDialogOpen(false)} // ESC/close
-            widthPx={COLS * TILE_PX}
-            tilePx={TILE_PX}
-          />
+
+          {!isMobile && (
+            <DialogueBox
+              isOpen={dialogOpen}
+              data={dialogData}
+              onAdvance={() => setDialogOpen(false)}
+              onClose={() => setDialogOpen(false)}
+              widthPx={COLS * TILE_PX}
+              tilePx={TILE_PX}
+            />
+          )}
+
+          <div className="fixed inset-0 pointer-events-none z-[60]">
+            {/* HUD Layer wrapper to keep fixed elements outside of scaled/translated context if needed, 
+                but currently we have MobileControls outside. 
+                This just ensures we have a reference context if we need it. 
+            */}
+          </div>
           {!welcomeOpen && <HelpButton onClick={() => setHelpOpen(true)} />}
 
           {/* Welcome (centered) */}
@@ -531,6 +641,7 @@ export default function GameRoot() {
             isOpen={welcomeOpen}
             widthPx={BOARD_W}
             onStart={() => setWelcomeOpen(false)}
+            isMobile={isMobile}
           />
 
           {/* Help (bottom) */}
@@ -538,18 +649,6 @@ export default function GameRoot() {
             isOpen={helpOpen}
             widthPx={BOARD_W}
             onClose={() => setHelpOpen(false)}
-          />
-
-          <ProximityAudio
-            src="/audio/singing.mp3"
-            tilePx={TILE_PX}
-            item={uke}
-            playerXY={renderXY} // the same XY you pass to PlayerSprite
-            unlocked={audioUnlocked}
-            fullRadiusTiles={1.2} // full volume within ~1.2 tiles
-            maxRadiusTiles={5} // silent at ~7 tiles
-            maxVolume={0.4} // cap volume
-            smooth={0.18} // smoothing factor
           />
 
           <ProximityAudio
@@ -565,6 +664,46 @@ export default function GameRoot() {
           />
           <BackButton />
         </div>
+
+        {/* HUD Layer (Screen-relative) */}
+        {!dialogOpen && !welcomeOpen && !helpOpen && (
+          <MobileControls onMove={startStep} />
+        )}
+
+        {isMobile && !dialogOpen && !welcomeOpen && !helpOpen && activeItem && (
+          <button
+            onClick={handleInteract}
+            className="fixed bottom-24 left-6 z-[80] bg-white/20 backdrop-blur-md text-white px-6 py-3 rounded-full font-bold shadow-lg border border-white/30 active:scale-95 transition-all animate-bounce"
+          >
+            Interact
+          </button>
+        )}
+
+        {isMobile &&
+          !welcomeOpen &&
+          !helpOpen &&
+          (flags.shoeWarnLevel ?? 0) > 0 &&
+          !flags.shoesOff && (
+            <button
+              onClick={handleShoes}
+              className="fixed bottom-40 left-6 z-[100] bg-red-500/30 backdrop-blur-md text-white px-6 py-3 rounded-full font-bold shadow-lg border border-red-200/40 active:scale-95 transition-all animate-pulse"
+            >
+              Take Shoes Off
+            </button>
+          )}
+
+        {isMobile && (
+          <DialogueBox
+            isOpen={dialogOpen}
+            data={dialogData}
+            onAdvance={() => setDialogOpen(false)}
+            onClose={() => setDialogOpen(false)}
+            widthPx={COLS * TILE_PX}
+            tilePx={TILE_PX}
+          />
+        )}
+
+        {/* Shoes Warning Pill (REMOVED) */}
       </div>
     </div>
   );
