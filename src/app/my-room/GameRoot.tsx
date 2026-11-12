@@ -204,6 +204,19 @@ export default function GameRoot() {
     };
   }, []);
 
+  // soundtrack: starts when the welcome screen is dismissed (a key press or click, so browsers allow it)
+  useEffect(() => {
+    if (welcomeOpen) return;
+    const a = new Audio("/audio/perfect-city.mp3");
+    a.loop = true;
+    a.volume = 0.25;
+    a.play().catch(() => {});
+    return () => {
+      a.pause();
+      a.src = "";
+    };
+  }, [welcomeOpen]);
+
   function playFoot(vol = 0.5) {
     if (!audioUnlocked) return; // reuse your existing unlock flag
     const pool = footPoolRef.current;
