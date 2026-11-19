@@ -4,21 +4,31 @@ import React, { useEffect } from "react";
 type Props = {
   isOpen: boolean;
   widthPx: number; // usually COLS * TILE_PX
+  ready: boolean; // sprites are loaded
+  loaded: number;
+  total: number;
   onStart: () => void; // called when Enter/click
 };
 
-export default function StartScreen({ isOpen, widthPx, onStart }: Props) {
+export default function StartScreen({
+  isOpen,
+  widthPx,
+  ready,
+  loaded,
+  total,
+  onStart,
+}: Props) {
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        onStart();
+        if (ready) onStart();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [isOpen, onStart]);
+  }, [isOpen, ready, onStart]);
 
   if (!isOpen) return null;
 
@@ -62,9 +72,12 @@ export default function StartScreen({ isOpen, widthPx, onStart }: Props) {
 
           <button
             onClick={onStart}
-            className="mt-3 inline-flex items-center justify-center px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold transition"
+            disabled={!ready}
+            className="mt-3 inline-flex items-center justify-center px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:bg-neutral-700 disabled:text-neutral-300 text-white text-sm font-semibold transition"
           >
-            Press Enter (or click) to start
+            {ready
+              ? "Press Enter (or click) to start"
+              : `Loading the room… ${loaded}/${total}`}
           </button>
         </div>
       </div>

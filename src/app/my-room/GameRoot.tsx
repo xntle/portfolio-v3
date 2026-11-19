@@ -4,7 +4,6 @@ import {
   COLS,
   ROWS,
   TILE_PX,
-  TILE_SRC,
   TOP_H,
   MAIN_H,
   ENTRANCE_W,
@@ -13,13 +12,12 @@ import { Pos, Flags, Item } from "./game/types";
 import { buildItemOcc, firstActiveItem } from "./game/utils";
 import { buildWalkable, buildWalls } from "./game/masks";
 import { ITEMS } from "./game/items";
-import { preloadSprites } from "./game/sprites";
+import { TILE_BG_SRC, usePrewarm } from "./game/preload";
 import { runDevChecks } from "./game/devChecks";
 import GridFloor from "../components/my-room/GridFloor";
 import Overlays from "../components/my-room/Overlays";
 // import Lights from "../components/my-room/Lights";
 import PlayerSprite, { Dir } from "../components/my-room/PlayerSprite";
-import { preloadPlayerSprites } from "./game/sprites";
 import DialogueBox, { DialogueData } from "../components/my-room/DialogueBox";
 import { ITEM_SPRITES } from "./game/sprites";
 import { placeholderDataUri } from "./game/utils";
@@ -63,6 +61,7 @@ export default function GameRoot() {
     return true;
   });
   const [helpOpen, setHelpOpen] = useState(false);
+  const prewarm = usePrewarm();
 
   // (optional) persist once they start
   useEffect(() => {
@@ -204,17 +203,24 @@ export default function GameRoot() {
     };
   }, []);
 
-  // soundtrack: starts when the welcome screen is dismissed (a key press or click, so browsers allow it)
+  // soundtrack: buffers behind the welcome screen, starts when it is dismissed
+  // (a key press or click, so browsers allow it)
+  const musicRef = useRef<HTMLAudioElement | null>(null);
   useEffect(() => {
-    if (welcomeOpen) return;
     const a = new Audio("/audio/perfect-city.mp3");
     a.loop = true;
+    a.preload = "auto";
     a.volume = 0.25;
-    a.play().catch(() => {});
+    musicRef.current = a;
     return () => {
       a.pause();
       a.src = "";
+      musicRef.current = null;
     };
+  }, []);
+  useEffect(() => {
+    if (welcomeOpen) return;
+    musicRef.current?.play().catch(() => {});
   }, [welcomeOpen]);
 
   function playFoot(vol = 0.5) {
@@ -229,10 +235,6 @@ export default function GameRoot() {
       a.play().catch(() => {});
     } catch {}
   }
-
-  useEffect(() => {
-    preloadPlayerSprites();
-  }, []);
 
   useEffect(() => {
     let raf: number | null = null;
@@ -354,16 +356,7 @@ export default function GameRoot() {
   }
 
   useEffect(() => {
-    preloadPlayerSprites();
-  }, []);
-
-  useEffect(() => {
     focusRef.current?.focus();
-  }, []);
-
-  // Preload tile & sprites
-  useEffect(() => {
-    preloadSprites([TILE_SRC]);
   }, []);
 
   // Dev checks (safe to disable if you like)
@@ -508,7 +501,7 @@ export default function GameRoot() {
             rows={ROWS}
             cols={COLS}
             tilePx={TILE_PX}
-            tileSrc={TILE_SRC}
+            tileSrc={TILE_BG_SRC}
             walkable={walkable}
             pos={pos}
             activeItem={activeItem}
@@ -543,6 +536,9 @@ export default function GameRoot() {
           <StartScreen
             isOpen={welcomeOpen}
             widthPx={BOARD_W}
+            ready={prewarm.ready}
+            loaded={prewarm.done}
+            total={prewarm.total}
             onStart={() => setWelcomeOpen(false)}
           />
 

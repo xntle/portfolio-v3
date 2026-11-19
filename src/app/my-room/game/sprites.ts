@@ -36,29 +36,6 @@ export const PLAYER_SPRITES = {
   up: ["/pixel/player/up1.png", "/pixel/player/up2.png"],
 } as const;
 
-export function preloadPlayerSprites() {
-  [
-    ...PLAYER_SPRITES.down,
-    ...PLAYER_SPRITES.right,
-    ...PLAYER_SPRITES.up,
-  ].forEach((src) => {
-    const img = new Image();
-    img.src = src;
-  });
-}
-
-export function preloadSprites(extra: string[] = []) {
-  const urls = [
-    ...Object.values(ITEM_SPRITES),
-    ...Object.values(WALL_SPRITES),
-    ...extra,
-  ].filter(Boolean) as string[];
-  urls.forEach((src) => {
-    const img = new Image();
-    img.src = src;
-  });
-}
-
 // Reuse placeholder generator from utils, but allow local import without cycles
 export function placeholderDataUri(label: string, px: number) {
   const W = px,
