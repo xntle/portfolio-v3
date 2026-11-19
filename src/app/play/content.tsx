@@ -62,8 +62,20 @@ const PROJECTS: Entry[] = [
 const EXPERIENCE: Entry[] = [
   {
     title: "Play Anything",
-    sub: "Product Engineer",
-    date: "Present",
+    sub: "Product Engineer · Full-time",
+    date: "Oct 2026 - Present",
+    text: "Building Anything Piano.",
+  },
+  {
+    title: "researched technologies",
+    sub: "Co-Founder",
+    date: "Apr 2026 - Present",
+    text: "Doing everything for breakfree (50k+ downloads, 30k+ on IG).",
+    tags: ["Swift", "Project Management"],
+    links: [
+      ["researchedtechnologies.com", "https://researchedtechnologies.com"],
+      ["@breakfree.app", "https://www.instagram.com/breakfree.app"],
+    ],
   },
   {
     title: "Shopify",

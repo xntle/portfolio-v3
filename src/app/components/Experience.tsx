@@ -9,6 +9,37 @@ export default function Experience() {
 
   const experiences = [
     {
+      role: "Product Engineer",
+      company: "Play Anything",
+      image: "",
+      duration: "Oct 2026 - Present",
+      summary: "Building Anything Piano.",
+      bullets: ["Full-time, on-site in the San Francisco Bay Area."],
+      tech: [],
+      projects: [],
+    },
+    {
+      role: "Co-Founder",
+      company: "researched technologies",
+      image: "",
+      duration: "Apr 2026 - Present",
+      summary: "Doing everything for breakfree (50k+ downloads, 30k+ on IG).",
+      bullets: [
+        "Doing everything for breakfree, a screen time control app with 50k+ downloads and 30k+ followers on Instagram.",
+      ],
+      tech: ["Swift", "Project Management"],
+      projects: [
+        {
+          name: "researchedtechnologies.com",
+          url: "https://researchedtechnologies.com",
+        },
+        {
+          name: "@breakfree.app",
+          url: "https://www.instagram.com/breakfree.app",
+        },
+      ],
+    },
+    {
       role: "Contract Software Engineer",
       company: "Shopify",
       image: "/shopify.png",
@@ -173,13 +204,23 @@ export default function Experience() {
                   {/* Left: Logo + Company/Role */}
                   <div className="flex items-center space-x-4">
                     {/* Logo */}
-                    <Image
-                      src={exp.image}
-                      alt={`${exp.company} logo`}
-                      width={40}
-                      height={40}
-                      className="w-10 h-10 rounded-full object-cover"
-                    />
+                    {exp.image ? (
+                      <Image
+                        src={exp.image}
+                        alt={`${exp.company} logo`}
+                        width={40}
+                        height={40}
+                        className="w-10 h-10 rounded-full object-cover"
+                      />
+                    ) : (
+                      // no logo file yet: show the company's initial
+                      <span
+                        aria-hidden="true"
+                        className="w-10 h-10 shrink-0 rounded-full grid place-items-center bg-gray-100 text-gray-700 dark:bg-zinc-800 dark:text-zinc-200 font-semibold uppercase"
+                      >
+                        {exp.company[0]}
+                      </span>
+                    )}
 
                     {/* Text: Company + Role */}
                     <div>

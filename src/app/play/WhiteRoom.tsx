@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
+import { FaEnvelope, FaGithub, FaLinkedin } from "react-icons/fa";
 import { createGame, type Game, type GameState } from "./game";
 import { NAV, ROOM, type ThingId } from "./room";
 import { SHEETS } from "./content";
@@ -18,6 +19,13 @@ const SHOES = [
   "Please take your shoes off. This is an asian household.",
   "TAKE YOUR SHOES OFF. This is an asian household.",
   "TAKE YOUR F***KING (FRICKING) SHOES OFF. THIS IS AN ASIAN HOUSEHOLD.",
+];
+
+// same three as the contact section on the home page
+const CONTACT = [
+  { label: "Email", href: "mailto:thaianle.work@gmail.com", Icon: FaEnvelope },
+  { label: "LinkedIn", href: "https://www.linkedin.com/in/thai-an-le/", Icon: FaLinkedin },
+  { label: "GitHub", href: "https://github.com/xntle", Icon: FaGithub },
 ];
 
 const short = (id: ThingId) => ROOM.find((t) => t.id === id)?.short ?? id;
@@ -158,7 +166,14 @@ export default function WhiteRoom() {
       <section className="wr-title">
         <div className="wr-says">
           <h1>{"hi, i'm an."}</h1>
-          <p className="wr-lede">{"i currently live in San Francisco, working for play anything as a product engineer."}</p>
+          <p className="wr-lede">{"i'm working for play anything as a product engineer."}</p>
+          <p className="wr-contact">
+            {CONTACT.map(({ label, href, Icon }) => (
+              <a key={label} href={href} aria-label={label} title={label} {...(href.startsWith("mailto:") ? {} : { target: "_blank", rel: "noopener noreferrer" })}>
+                <Icon aria-hidden="true" />
+              </a>
+            ))}
+          </p>
         </div>
         <button className="wr-start" type="button" onClick={() => gameRef.current?.start()} disabled={state !== "title"}>
           Start <span aria-hidden="true">→</span>

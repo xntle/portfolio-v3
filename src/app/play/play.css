@@ -39,6 +39,11 @@
 .wr-says::after { content: ""; position: absolute; left: calc(100% + 14px); top: 20px; width: var(--line); height: 1px; background: var(--ink); }
 .wr-title h1 { font-size: clamp(30px, 3.4vw, 44px); line-height: 1; font-weight: 500; letter-spacing: -.04em; margin: 0; }
 .wr-lede { margin: 0; color: var(--ink-2); font-size: clamp(16px, 1.5vw, 19px); line-height: 1.4; letter-spacing: -.01em; text-wrap: pretty; }
+.wr-contact { margin: 6px 0 0; display: flex; gap: 6px; }
+.wr-contact a { display: grid; place-items: center; width: 36px; height: 36px; margin-left: -9px; font-size: 18px; color: var(--ink-2); transition: color .15s ease; }
+.wr-contact a + a { margin-left: 0; }
+.wr-contact a:hover { color: var(--ink); }
+.wr-tall .wr-contact a { margin-left: 0; }
 .wr-start { background: var(--ink); color: var(--paper) !important; border: 0; border-radius: 2px; padding: 15px 22px 15px 24px; font-family: var(--font-mono) !important; font-size: 12px !important; letter-spacing: .14em; text-transform: uppercase; display: flex; gap: 28px; align-items: center; }
 .wr-start span { transition: transform .2s ease; }
 .wr-start:hover span { transform: translateX(5px); }

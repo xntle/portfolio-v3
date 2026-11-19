@@ -31,6 +31,14 @@ Platforms / DevOps / Infra:
  Git, Docker, SSH, SQLite, MongoDB, PostgreSQL, Firebase, Supabase, Pinecone, AWS, Stripe, Clerk, Whisper
 
 Experience
+Product Engineer
+ Play Anything · Oct 2026 – Present · San Francisco Bay Area
+Building Anything Piano, an app for learning any song on piano.
+
+Co-Founder
+ researched technologies · Apr 2026 – Present
+Doing everything for breakfree, a screen time control app (50k+ downloads, 30k+ on Instagram).
+
 Contract Software Engineer
  Shopify · Aug 2025 – Present
 Built Shop Mini "Fit Check" - Clothes Recommendations and AI Try On.
