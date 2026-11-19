@@ -181,7 +181,8 @@ export default function GameRoot() {
     tileCenterPx(start.r, start.c)
   );
   const [frameIndex, setFrameIndex] = useState<0 | 1>(0); // 0 = *1.png*, 1 = *2.png*
-  const queuedDirRef = useRef<Dir | null>(null);
+  // direction keys currently held, most recent last
+  const heldDirsRef = useRef<Dir[]>([]);
   // pool a few audio elements to prevent play-lag overlaps
   const footPoolRef = useRef<HTMLAudioElement[]>([]);
   const footIdxRef = useRef(0);
@@ -267,12 +268,7 @@ export default function GameRoot() {
         setPos(to);
         setFrameIndex(0);
         setAnim(null);
-
-        // chain next step if queued
-        const q = queuedDirRef.current;
-        queuedDirRef.current = null;
-        if (q) startStep(q);
-        else raf = requestAnimationFrame(tick);
+        raf = requestAnimationFrame(tick);
       }
     };
 
@@ -281,6 +277,17 @@ export default function GameRoot() {
       if (raf) cancelAnimationFrame(raf);
     };
   }, [anim, pos.r, pos.c]);
+
+  const keyToDir = (key: string): Dir | null =>
+    key === "arrowup" || key === "w"
+      ? "up"
+      : key === "arrowdown" || key === "s"
+      ? "down"
+      : key === "arrowleft" || key === "a"
+      ? "left"
+      : key === "arrowright" || key === "d"
+      ? "right"
+      : null;
 
   const dirToDelta = (d: Dir) =>
     d === "up"
@@ -321,12 +328,16 @@ export default function GameRoot() {
     });
   }
 
+  // keep walking while a direction key is held
+  useEffect(() => {
+    if (anim) return;
+    const held = heldDirsRef.current;
+    if (held.length) startStep(held[held.length - 1]);
+  }, [anim]);
+
   function startStep(d: Dir) {
+    if (anim) return; // finish the current step first, then turn
     setDir(d);
-    if (anim) {
-      queuedDirRef.current = d;
-      return;
-    }
     const [dr, dc] = dirToDelta(d);
     const from = pos;
     const to = { r: pos.r + dr, c: pos.c + dc };
@@ -366,43 +377,6 @@ export default function GameRoot() {
     }
   }, [walkable, items]);
 
-  // flip frames while moving
-  useEffect(() => {
-    if (!anim) return;
-    const id = setInterval(() => setFrameIndex((f) => (f === 0 ? 1 : 0)), 100);
-    return () => clearInterval(id);
-  }, [anim]);
-
-  // RAF tick (keep your version; example shown)
-  useEffect(() => {
-    let raf: number | null = null;
-    const easeOutQuad = (t: number) => 1 - (1 - t) * (1 - t);
-
-    const tick = (t: number) => {
-      if (!anim) {
-        setRenderXY(tileCenterPx(pos.r, pos.c));
-        raf = requestAnimationFrame(tick);
-        return;
-      }
-      const { from, to, start, dur } = anim;
-      const p = Math.min(1, (t - start) / dur);
-      const k = easeOutQuad(p);
-      const A = tileCenterPx(from.r, from.c);
-      const B = tileCenterPx(to.r, to.c);
-      setRenderXY({ x: A.x + (B.x - A.x) * k, y: A.y + (B.y - A.y) * k });
-
-      if (p < 1) raf = requestAnimationFrame(tick);
-      else {
-        setPos(to);
-        setAnim(null);
-        raf = requestAnimationFrame(tick);
-      }
-    };
-    raf = requestAnimationFrame(tick);
-    return () => {
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, [anim, pos.r, pos.c]);
   // Movement (blocks walls AND items)
   const blockedByItem = (r: number, c: number) => !!itemOcc[r]?.[c];
   const blockedByWall = (r: number, c: number) => !!wallOcc[r]?.[c];
@@ -454,11 +428,17 @@ export default function GameRoot() {
     }
 
     let handled = true;
-    if (key === "arrowup" || key === "w") startStep("up");
-    else if (key === "arrowdown" || key === "s") startStep("down");
-    else if (key === "arrowleft" || key === "a") startStep("left");
-    else if (key === "arrowright" || key === "d") startStep("right");
-    else if (key === "r") {
+    const moveDir = keyToDir(key);
+    if (moveDir) {
+      // key repeat is ignored; the held list keeps the walk going
+      if (!e.repeat) {
+        heldDirsRef.current = [
+          ...heldDirsRef.current.filter((d) => d !== moveDir),
+          moveDir,
+        ];
+        startStep(moveDir);
+      }
+    } else if (key === "r") {
       setPos(start);
       if (keydownTimeoutRef.current !== null) {
         window.clearTimeout(keydownTimeoutRef.current);
@@ -482,6 +462,12 @@ export default function GameRoot() {
     if (handled) e.preventDefault();
   };
 
+  const onKeyUp: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
+    const moveDir = keyToDir(e.key.toLowerCase());
+    if (moveDir)
+      heldDirsRef.current = heldDirsRef.current.filter((d) => d !== moveDir);
+  };
+
   return (
     <div className="min-h-dvh w-full bg-black flex items-center justify-center">
       <div
@@ -490,6 +476,8 @@ export default function GameRoot() {
         role="application"
         aria-label="Grid movement play area"
         onKeyDown={onKeyDown}
+        onKeyUp={onKeyUp}
+        onBlur={() => (heldDirsRef.current = [])}
         className="outline-none select-none relative"
       >
         {/* One wrapper that sets board size; overlays anchor to this */}
