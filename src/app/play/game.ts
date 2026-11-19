@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { ROOM, type Thing, type ThingId } from "./room";
+import { NAV, ROOM, type Thing, type ThingId } from "./room";
 import { createAudio } from "./audio";
 
 // The white room: a first-person walk through stippled furniture.
@@ -11,10 +11,8 @@ export type GameState = "title" | "intro" | "play";
 export type GameOptions = {
   app: HTMLElement;
   canvas: HTMLCanvasElement;
-  /** Container the floating object labels are created in. */
+  /** Container the floating section words are created in. */
   labels: HTMLElement;
-  /** Coordinate readout. */
-  coords: HTMLElement;
   /** Touch joystick ring; its first child is the knob. */
   stick: HTMLElement;
   onState: (s: GameState) => void;
@@ -27,13 +25,25 @@ export type GameOptions = {
 export type Game = {
   start: () => void;
   walkTo: (id: ThingId) => void;
-  /** Freeze movement and input while a sheet is open. */
-  setPaused: (paused: boolean) => void;
+  /** Freeze movement and input. `sheet` says a sheet is covering part of the view. */
+  setPaused: (paused: boolean, sheet?: boolean) => void;
+  /** The host says something (the shoes-off rule). */
+  say: () => void;
+  /** Leave your shoes at the entrance. */
+  takeShoesOff: () => void;
   setMuted: (muted: boolean) => void;
   dispose: () => void;
 };
 
-type Live = Thing & { ap: { x: number; z: number }; anchor: THREE.Vector3; el: HTMLButtonElement };
+type Live = Thing & {
+  ap: { x: number; z: number };
+  anchor: THREE.Vector3;
+  /** The section word floating over it, for the four portfolio sections only. */
+  el?: HTMLButtonElement;
+  /** Where that word is on screen right now. */
+  sx: number;
+  sy: number;
+};
 type Mat = THREE.Material;
 type Builder = (g: THREE.Group, m: Mat, ex: number[]) => void;
 
@@ -545,16 +555,20 @@ export function createGame(opts: GameOptions): Game | null {
     stipple(g, t.dens ?? 2600, t.dot ?? 0.03, ex);
     scene.add(g);
 
-    const el = document.createElement("button");
-    el.type = "button";
-    el.className = "wr-lb" + (t.soft ? " wr-soft" : "");
-    el.textContent = t.label;
-    el.setAttribute("aria-label", "Walk to " + t.label);
-    el.addEventListener("click", () => walkTo(t.id));
-    opts.labels.appendChild(el);
+    // Items carry no names. Only the four sections get a word floating in the air.
+    const word = NAV.find((n) => n.id === t.id);
+    let el: HTMLButtonElement | undefined;
+    if (word) {
+      el = document.createElement("button");
+      el.type = "button";
+      el.className = "wr-lb";
+      el.textContent = word.label;
+      el.addEventListener("click", () => walkTo(t.id));
+      opts.labels.appendChild(el);
+    }
 
     const d = t.r + (t.stand ?? 1.9); // where you stand to look at it
-    return { ...t, el, ap: { x: x + Math.sin(t.rot) * d, z: z + Math.cos(t.rot) * d }, anchor: new THREE.Vector3(x, t.h + 0.2, z) };
+    return { ...t, el, sx: 0, sy: 0, ap: { x: x + Math.sin(t.rot) * d, z: z + Math.cos(t.rot) * d }, anchor: new THREE.Vector3(x, t.h + 0.45, z) };
   });
   const byId = new Map(things.map((t) => [t.id, t]));
 
@@ -586,12 +600,52 @@ export function createGame(opts: GameOptions): Game | null {
     scene.add(dust(mat, 0.036));
   }
 
+  /* your shoes, left where you came in once you have taken them off */
+  const shoes = new THREE.Group();
+  let shoesDust: THREE.ShaderMaterial;
+  {
+    const m = solidMat();
+    // a pair of sneakers, toes pointing away from you
+    for (const [x, z, turn] of [[-0.1, 0, 0.14], [0.1, 0.03, -0.1]]) {
+      const shoe = new THREE.Group();
+      shoe.position.set(x, 0, z);
+      shoe.rotation.y = turn;
+      shoes.add(shoe);
+      box(shoe, m, 0.105, 0.03, 0.29, 0, 0.015, 0); // sole
+      box(shoe, m, 0.1, 0.05, 0.17, 0, 0.055, 0.05); // upper
+      sph(shoe, m, 0.05, 0, 0.045, -0.09).scale.set(1, 0.75, 1.25); // toe
+      box(shoe, m, 0.1, 0.05, 0.09, 0, 0.1, 0.09); // collar round the ankle
+    }
+    const ex: number[] = [];
+    for (let i = 0; i < 90; i++) ex.push(gauss() * 0.16, Math.abs(gauss()) * 0.008, gauss() * 0.16);
+    shoesDust = stipple(shoes, 26000, 0.011, ex).material;
+  }
+  shoes.visible = false;
+  scene.add(shoes);
+
   figure.position.set(0, 0, START_Z);
   scene.add(figure);
 
   /* ---------- state ---------- */
   let state: GameState = "title";
   let paused = false;
+  let sheetOpen = false;
+  /* taking your shoes off: look down at your feet, the shoes slide out from
+     under you, look back up. `from` is where you were looking before. */
+  let cine: { t: number; from: number } | null = null;
+  const LOOK_DOWN = -1.12;
+  const ease = (u: number) => {
+    const c = Math.max(0, Math.min(1, u));
+    return c * c * (3 - 2 * c);
+  };
+  function placeShoes(k: number) {
+    const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+    const d = 0.2 + 0.5 * k; // metres in front of your feet
+    shoes.position.set(pos.x + fx * d, 0, pos.z + fz * d);
+    shoes.rotation.y = yaw;
+    shoesDust.uniforms.uOpacity.value = k;
+    shoes.visible = k > 0;
+  }
   let disposed = false;
   let introT = 0, clockT = 0;
   const pos = { x: 0, z: START_Z };
@@ -679,6 +733,11 @@ export function createGame(opts: GameOptions): Game | null {
   const onKeyDown = (e: KeyboardEvent) => {
     if (state !== "play" || paused) return;
     const k = keyName(e);
+    const n = NAV[Number(k) - 1];
+    if (n) {
+      walkTo(n.id);
+      return;
+    }
     if (k === "e" || k === "x") {
       if (focus) activate(focus);
       return;
@@ -731,7 +790,7 @@ export function createGame(opts: GameOptions): Game | null {
     if (!everLocked) lockFailed = true;
   };
   const onMouseMove = (e: MouseEvent) => {
-    if (!locked || state !== "play" || paused || auto) return;
+    if (!locked || state !== "play" || paused || auto || cine) return;
     yaw -= e.movementX * 0.0022;
     pitch = Math.max(-1.2, Math.min(1.2, pitch - e.movementY * 0.0022));
   };
@@ -748,6 +807,12 @@ export function createGame(opts: GameOptions): Game | null {
 
   const center = new THREE.Vector3();
   function pick(x: number, y: number): Live | null {
+    // pointing at a floating word is as good as pointing at its item
+    for (const t of things) {
+      if (!t.el) continue;
+      const hw = t.el.offsetWidth / 2 + 6, hh = t.el.offsetHeight / 2 + 6;
+      if (Math.abs(x - t.sx) < hw && Math.abs(y - t.sy) < hh) return t;
+    }
     let best: Live | null = null, bestDepth = Infinity;
     const k = H / 2 / Math.tan((camera.fov * Math.PI) / 360);
     for (const t of things) {
@@ -878,10 +943,7 @@ export function createGame(opts: GameOptions): Game | null {
   canvas.addEventListener("wheel", onWheel, { passive: false });
 
   /* ---------- loop ---------- */
-  let lastCoords = "";
-  let lastCountdown = "";
   let lastCx = -1, lastCy = -1;
-  const fmt = (v: number) => (v < 0 ? "−" : " ") + Math.abs(v).toFixed(1).padStart(4, "0");
 
   function collide() {
     for (const t of things) {
@@ -898,7 +960,14 @@ export function createGame(opts: GameOptions): Game | null {
 
   function play(dt: number) {
     let moving = 0;
-    if (!paused) {
+    if (cine) {
+      cine.t += dt;
+      const t = cine.t;
+      if (t < 1.9) pitch = cine.from + (LOOK_DOWN - cine.from) * ease(t / 0.7);
+      else pitch = LOOK_DOWN * (1 - ease((t - 1.9) / 0.7));
+      placeShoes(ease((t - 0.55) / 0.9));
+      if (t >= 2.6) cine = null;
+    } else if (!paused) {
       const target = auto ? byId.get(auto.id) : undefined;
       if (auto && target) {
         // walk to the spot in front of the object, then turn to face it
@@ -968,32 +1037,40 @@ export function createGame(opts: GameOptions): Game | null {
       }
     }
     near = bestD < REACH ? best : null;
-    const left = yearLeft();
-    const countdown = `${left.year} ends in ${left.days}d ${left.hours}h`;
-    if (countdown !== lastCountdown) {
-      lastCountdown = countdown;
-      const c = byId.get("clock");
-      if (c) c.el.textContent = countdown;
-    }
-    const txt = `X${fmt(pos.x)} · Z${fmt(pos.z)} · ${best.short} ${Math.max(0, bestD).toFixed(1)} m`;
-    if (txt !== lastCoords) opts.coords.textContent = lastCoords = txt;
   }
 
+  /* The section words hang in the air over their items. When an item is off to
+     the side or behind you, its word slides to the edge of the view on that
+     side, so all four are always there to press. */
   function placeLabels() {
     camera.updateMatrixWorld();
+    const mx = Math.min(90, W * 0.16), top = 64, bottom = H - 84;
     for (const t of things) {
+      if (!t.el) continue;
       tmp.copy(t.anchor).project(camera);
-      const visible = tmp.z < 1 && Math.abs(tmp.x) < 1.15 && Math.abs(tmp.y) < 1.2;
-      if (!visible) {
-        t.el.style.visibility = "hidden";
-        continue;
+      let x = (tmp.x * 0.5 + 0.5) * W, y = (-tmp.y * 0.5 + 0.5) * H;
+      const behind = tmp.z > 1;
+      if (behind) {
+        // mirrored by the projection: put it on the side you would turn to
+        x = tmp.x < 0 ? W : 0;
+        y = H / 2;
       }
-      const d = Math.hypot(pos.x - t.at[0], pos.z - t.at[1]);
-      t.el.style.visibility = "visible";
-      t.el.style.opacity = Math.max(0.18, Math.min(1, 1.25 - d / 20)).toFixed(2);
-      t.el.style.transform = `translate(${((tmp.x * 0.5 + 0.5) * W).toFixed(1)}px,${((-tmp.y * 0.5 + 0.5) * H).toFixed(1)}px) translate(-50%,-100%)`;
+      const cx = Math.max(mx, Math.min(W - mx, x)), cy = Math.max(top, Math.min(bottom, y));
+      t.sx = cx;
+      t.sy = cy;
+      t.el.classList.toggle("wr-pinned", behind || cx !== x || cy !== y);
       t.el.classList.toggle("wr-near", t === focus || t === hover);
     }
+    // words that land on top of each other step down one line each
+    const words = things.filter((t) => t.el).sort((a, b) => a.sy - b.sy);
+    for (let i = 1; i < words.length; i++) {
+      for (let j = 0; j < i; j++) {
+        const a = words[j], b = words[i];
+        const tooClose = Math.abs(a.sx - b.sx) < ((a.el?.offsetWidth ?? 0) + (b.el?.offsetWidth ?? 0)) / 2 && b.sy - a.sy < 30;
+        if (tooClose) b.sy = a.sy + 30;
+      }
+    }
+    for (const t of words) if (t.el) t.el.style.transform = `translate(${t.sx.toFixed(1)}px,${t.sy.toFixed(1)}px) translate(-50%,-50%)`;
   }
 
   let raf = 0;
@@ -1053,8 +1130,8 @@ export function createGame(opts: GameOptions): Game | null {
         placeLabels();
       }
       // side sheet on wide screens, bottom sheet (72% tall) on narrow ones
-      const want = paused && W > 640 ? Math.min(SHEET_W, W) / 2 : 0;
-      const wantY = paused && W <= 640 ? H * 0.34 : 0;
+      const want = sheetOpen && W > 640 ? Math.min(SHEET_W, W) / 2 : 0;
+      const wantY = sheetOpen && W <= 640 ? H * 0.34 : 0;
       if (Math.abs(want - shift) > 0.5 || Math.abs(wantY - shiftY) > 0.5) {
         const k = reduced ? 1 : Math.min(1, dt * 7);
         shift += (want - shift) * k;
@@ -1078,8 +1155,16 @@ export function createGame(opts: GameOptions): Game | null {
       setState("intro");
     },
     walkTo,
-    setPaused(p) {
+    say() {
+      audio.say();
+    },
+    takeShoesOff() {
+      if (reduced) placeShoes(1);
+      else cine = { t: 0, from: pitch };
+    },
+    setPaused(p, sheet = p) {
       paused = p;
+      sheetOpen = p && sheet;
       // hand the cursor back for reading a sheet, take it again afterwards
       if (p && locked) document.exitPointerLock();
       if (!p && state === "play" && everLocked) lock();
@@ -1112,7 +1197,7 @@ export function createGame(opts: GameOptions): Game | null {
       document.removeEventListener("mousemove", onMouseMove);
       if (document.pointerLockElement === canvas) document.exitPointerLock();
       app.classList.remove("wr-locked", "wr-aim");
-      for (const t of things) t.el.remove();
+      for (const t of things) t.el?.remove();
       scene.traverse((o) => {
         const m = o as THREE.Mesh | THREE.Points;
         if (m.geometry) m.geometry.dispose();

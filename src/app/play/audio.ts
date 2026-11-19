@@ -8,6 +8,8 @@ export type RoomAudio = {
   /** Call from a click: browsers only allow sound after a user gesture. */
   unlock: () => void;
   setMuted: (muted: boolean) => void;
+  /** The host talking, for the shoes-off rule. */
+  say: () => void;
   /** Once per frame, with the player's position and how fast they are walking (0..1). */
   update: (x: number, z: number, moving: number, dt: number) => void;
   dispose: () => void;
@@ -36,6 +38,10 @@ export function createAudio(sources: { at: [number, number]; src: string; max: n
   });
   let nextStep = 0;
 
+  const talk = new Audio("/audio/talking.mp3");
+  talk.preload = "auto";
+  talk.volume = 0.5;
+
   const near: Source[] = sources.map((s) => {
     const el = new Audio(s.src);
     el.loop = true;
@@ -44,7 +50,7 @@ export function createAudio(sources: { at: [number, number]; src: string; max: n
     return { at: s.at, el, vol: 0, max: s.max };
   });
 
-  const all = () => [music, ...steps, ...near.map((n) => n.el)];
+  const all = () => [music, talk, ...steps, ...near.map((n) => n.el)];
   const quiet = () => all().forEach((a) => a.pause());
 
   // do not keep playing in a background tab
@@ -64,6 +70,11 @@ export function createAudio(sources: { at: [number, number]; src: string; max: n
       muted = m;
       if (m) quiet();
       else if (unlocked) music.play().catch(() => {});
+    },
+    say() {
+      if (!unlocked || muted) return;
+      talk.currentTime = 0;
+      talk.play().catch(() => {});
     },
     update(x, z, moving, dt) {
       if (!unlocked || muted || document.hidden) return;

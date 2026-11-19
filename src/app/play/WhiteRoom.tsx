@@ -11,13 +11,21 @@ import "./play.css";
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
 
+// The house rule from the my-room game: nobody walks in with shoes on.
+// Saying no only makes the host angrier.
+const SHOES = [
+  "did you take your shoes off?",
+  "Please take your shoes off. This is an asian household.",
+  "TAKE YOUR SHOES OFF. This is an asian household.",
+  "TAKE YOUR F***KING (FRICKING) SHOES OFF. THIS IS AN ASIAN HOUSEHOLD.",
+];
+
 const short = (id: ThingId) => ROOM.find((t) => t.id === id)?.short ?? id;
 
 export default function WhiteRoom() {
   const appRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const labelsRef = useRef<HTMLDivElement>(null);
-  const coordsRef = useRef<HTMLSpanElement>(null);
   const stickRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const gameRef = useRef<Game | null>(null);
@@ -29,13 +37,18 @@ export default function WhiteRoom() {
   const [coarse, setCoarse] = useState(false);
   const [muted, setMuted] = useState(false);
   const [locked, setLocked] = useState(false);
+  const [shoesOff, setShoesOff] = useState(false);
+  const [anger, setAnger] = useState(0);
+  const shoesRef = useRef<HTMLButtonElement>(null);
+  // you are stopped at the entrance until your shoes are off
+  const gate = state === "play" && !shoesOff && !noGL;
 
   useEffect(() => {
     setCoarse(window.matchMedia("(pointer: coarse)").matches);
     const app = appRef.current, canvas = canvasRef.current, labels = labelsRef.current;
-    const coords = coordsRef.current, stick = stickRef.current;
-    if (!app || !canvas || !labels || !coords || !stick) return;
-    const game = createGame({ app, canvas, labels, coords, stick, onState: setState, onFocus: setFocus, onOpen: setPanel, onLock: setLocked });
+    const stick = stickRef.current;
+    if (!app || !canvas || !labels || !stick) return;
+    const game = createGame({ app, canvas, labels, stick, onState: setState, onFocus: setFocus, onOpen: setPanel, onLock: setLocked });
     if (!game) {
       // no WebGL: skip the room, the nav still opens every section
       setNoGL(true);
@@ -50,9 +63,30 @@ export default function WhiteRoom() {
   }, []);
 
   useEffect(() => {
-    gameRef.current?.setPaused(panel !== null);
+    gameRef.current?.setPaused(panel !== null || gate, panel !== null);
     if (panel) closeRef.current?.focus();
-  }, [panel]);
+  }, [panel, gate]);
+
+  const takeShoesOff = useCallback(() => {
+    gameRef.current?.takeShoesOff();
+    setShoesOff(true);
+    canvasRef.current?.focus();
+  }, []);
+  const refuse = () => {
+    setAnger((a) => Math.min(SHOES.length - 1, a + 1));
+    gameRef.current?.say();
+  };
+
+  useEffect(() => {
+    if (!gate) return;
+    gameRef.current?.say();
+    shoesRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === "j") takeShoesOff();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [gate, takeShoesOff]);
 
   useEffect(() => {
     gameRef.current?.setMuted(muted);
@@ -88,7 +122,7 @@ export default function WhiteRoom() {
   return (
     <div
       ref={appRef}
-      className={`wr ${geist.variable} ${geistMono.variable}${panel ? " wr-has-sheet" : ""}`}
+      className={`wr ${geist.variable} ${geistMono.variable}${panel ? " wr-has-sheet" : ""}${gate ? " wr-gated" : ""}`}
       data-state={state}
     >
       <canvas
@@ -100,30 +134,25 @@ export default function WhiteRoom() {
 
       <div ref={labelsRef} className="wr-labels" />
       <div className="wr-top">
-        <span className="wr-id">
-          <Link href="/" className="wr-mono wr-home">
-            ← Home
-          </Link>
-          <b className="wr-hud">Thai An (An) Le</b>
-        </span>
-        <nav className="wr-nav wr-hud" aria-label="Walk to">
+        <Link href="/" className="wr-name" aria-label="Thai An (An) Le, back to home">
+          Thai An (An) Le
+        </Link>
+        <span className="wr-mono wr-place">San Francisco, CA</span>
+      </div>
+
+      {noGL ? (
+        <nav className="wr-nav" aria-label="Sections">
           {NAV.map((n) => (
             <button key={n.id} type="button" onClick={() => go(n.id)}>
               {n.label}
             </button>
           ))}
         </nav>
-        <span className="wr-readout">
-          <span ref={coordsRef} className="wr-mono wr-coords wr-hud">
-            X 00.0 · Z 08.0
-          </span>
-          {!noGL && (
-            <button className="wr-tbtn wr-sound" type="button" aria-pressed={!muted} onClick={() => setMuted((m) => !m)}>
-              Sound {muted ? "off" : "on"}
-            </button>
-          )}
-        </span>
-      </div>
+      ) : (
+        <button className="wr-tbtn wr-sound" type="button" aria-pressed={!muted} onClick={() => setMuted((m) => !m)}>
+          Sound {muted ? "off" : "on"}
+        </button>
+      )}
 
       {/* the line that comes out of the figure, and what it says */}
       <section className="wr-title">
@@ -144,9 +173,9 @@ export default function WhiteRoom() {
         ) : (
           <p className="wr-mono wr-hint">
             {coarse
-              ? "Left thumb moves · Right thumb looks · Tap a name"
+              ? "Left thumb moves · Right thumb looks · Tap a word"
               : locked
-                ? "Mouse looks · Hold click or W A S D to walk · Click an item · Esc frees the cursor"
+                ? "Mouse looks · Hold click or W A S D to walk · Click an item or a word · Esc frees the cursor"
                 : "Click the room to look around with your mouse"}
           </p>
         )}
@@ -154,7 +183,7 @@ export default function WhiteRoom() {
 
       <i className="wr-cross" aria-hidden="true" />
       {/* the Open prompt rides on the cursor */}
-      {!coarse && focus && !panel && state === "play" && (
+      {!coarse && focus && !panel && !gate && state === "play" && (
         <span className="wr-prompt" aria-live="polite">
           Open <b>{short(focus)}</b> <kbd>click</kbd>
         </span>
@@ -163,6 +192,21 @@ export default function WhiteRoom() {
       <div ref={stickRef} className="wr-stick" hidden aria-hidden="true">
         <i />
       </div>
+
+      {gate && (
+        <div key={anger} className={`wr-gate${anger > 1 ? " wr-angry" : ""}`} role="alertdialog" aria-labelledby="wr-gate-line">
+          <span className="wr-mono">Thai An</span>
+          <p id="wr-gate-line">{SHOES[anger]}</p>
+          <div className="wr-gate-acts">
+            <button ref={shoesRef} className="wr-start" type="button" onClick={takeShoesOff}>
+              Take shoes off <kbd>J</kbd>
+            </button>
+            <button className="wr-tbtn" type="button" onClick={refuse}>
+              No
+            </button>
+          </div>
+        </div>
+      )}
 
       {sheet && panel && (
         <aside key={panel} className="wr-sheet" role="dialog" aria-labelledby="wr-sheet-title">
