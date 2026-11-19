@@ -1,34 +1,14 @@
 "use client";
 
-import Hero from "@/app/components/Hero";
-import Header from "./components/ui/Header";
-import Chat from "./components/ui/Chat";
-import About from "./components/About";
-import TechStack from "./components/TechStack";
-import Experience from "./components/Experience";
-import Projects from "./components/Projects";
-import Archive from "./components/Archives";
-import Contact from "./components/Contacts";
+import dynamic from "next/dynamic";
 
-// import { AvatarCanvas } from "./components/ui/AvatarCanvas";
+// The room is the front page. The older scrolling portfolio lives at /classic.
+// three.js and the room only make sense in the browser.
+const WhiteRoom = dynamic(() => import("./play/WhiteRoom"), {
+  ssr: false,
+  loading: () => <div style={{ position: "fixed", inset: 0, background: "#f8f8f7" }} />,
+});
 
 export default function Home() {
-  return (
-    <>
-      <Header></Header>
-      <Chat></Chat>
-
-      <div className="min-h-screen flex flex-col items-center justify-start px-4 w-full">
-        <div className="w-full max-w-xl">
-          <Hero></Hero>
-          <About></About>
-          <TechStack></TechStack>
-          <Experience></Experience>
-          <Projects></Projects>
-          <Archive></Archive>
-          <Contact></Contact>
-        </div>
-      </div>
-    </>
-  );
+  return <WhiteRoom />;
 }

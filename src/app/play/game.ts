@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { NAV, ROOM, type Thing, type ThingId } from "./room";
+import { BOARD_MM, DARTS_PER_ROUND, scoreDart, type DartHit, type DartsState } from "./darts";
 import { createAudio } from "./audio";
 
 // The white room: a first-person walk through stippled furniture.
@@ -18,6 +19,8 @@ export type GameOptions = {
   onOpen: (id: ThingId) => void;
   /** The mouse has been captured (true) or released (false). */
   onLock: (locked: boolean) => void;
+  /** The dart game at the dartboard: its score while you are playing, null once you leave. */
+  onDarts: (darts: DartsState | null) => void;
 };
 
 export type Game = {
@@ -27,6 +30,8 @@ export type Game = {
   setPaused: (paused: boolean, sheet?: boolean) => void;
   /** The host says something (the shoes-off rule). */
   say: () => void;
+  /** Step away from the dartboard. */
+  leaveDarts: () => void;
   /** Leave your shoes at the entrance. */
   takeShoesOff: () => void;
   setMuted: (muted: boolean) => void;
@@ -51,6 +56,9 @@ const REACH = 2.3; // metres from an item's edge within which it opens without w
 const YEAR_DX = 0.1;
 const YEAR_DY = 0.13;
 const YEAR_TOP = 2.3;
+const BOARD_Y = 1.7; // height of the dartboard's centre
+const BOARD_R = 0.34; // its radius, to the outside of the double ring
+const BOARD_OUT = 0.02; // how far it stands off the wall
 
 /** What is left of the current year. */
 export function yearLeft(now = new Date()) {
@@ -500,6 +508,28 @@ export function createGame(opts: GameOptions): Game | null {
       }
     },
 
+    darts(g, _m, ex) {
+      // a dartboard on the wall: wires, every other wedge filled in. The darts are yours to throw.
+      const Y = BOARD_Y, Z = BOARD_OUT, R = BOARD_R;
+      const ring = (r: number, n: number) => inkRing(ex, 0, Y, r, Z, n);
+      ring(R, 900);
+      ring(R * 0.95, 700);
+      ring(R * 0.63, 520);
+      ring(R * 0.58, 480);
+      ring(R * 0.095, 110);
+      inkRing(ex, 0, Y, R * 0.04, Z, 60, true);
+      for (let i = 0; i < 20; i++) {
+        const a = ((i * 18 + 9) * Math.PI) / 180;
+        inkLine(ex, Math.sin(a) * R * 0.095, Y + Math.cos(a) * R * 0.095, Math.sin(a) * R, Y + Math.cos(a) * R, Z);
+        if (i % 2) continue;
+        // shade this wedge between the bull and the triple ring
+        for (let k = 0; k < 150; k++) {
+          const an = ((i * 18 - 9 + rnd() * 18) * Math.PI) / 180, rr = R * (0.1 + 0.48 * Math.sqrt(rnd()));
+          ex.push(Math.sin(an) * rr, Y + Math.cos(an) * rr, Z);
+        }
+      }
+    },
+
     celsius(g, m) {
       // crushed, on its side on the floor where it was left
       const geo = new THREE.CylinderGeometry(0.055, 0.055, 0.2, 24, 10);
@@ -654,31 +684,30 @@ export function createGame(opts: GameOptions): Game | null {
 
   function titlePose() {
     const wide = W / H > 1;
-    vA.set(wide ? 0.6 : 0, wide ? 1.3 : 1.45, START_Z + (wide ? 3.8 : 3.7));
+    vA.set(0, wide ? 1.3 : 1.45, START_Z + (wide ? 3.8 : 3.7));
     tmpCam.position.copy(vA);
-    // wide: aim left of the figure so it sits in the right half, leaving room for the title
-    if (wide) tmpCam.lookAt(-1.0, 1.0, START_Z);
-    else tmpCam.lookAt(0, 0.5, START_Z);
+    // wide: aim high so the head sits near the middle, with room for the words on top of it
+    tmpCam.lookAt(0, wide ? 1.45 : 0.5, START_Z);
     qA.copy(tmpCam.quaternion);
-    // where the figure's head is on screen, so the page can run its line out of it:
-    // from the side of the head on wide screens, from the top of it on tall ones
+    // where the top of the figure's head is on screen: the words sit on it
     tmpCam.fov = camera.fov;
     tmpCam.aspect = camera.aspect;
     tmpCam.updateProjectionMatrix();
     tmpCam.updateMatrixWorld();
-    if (wide) tmp.set(-0.2, 1.63, START_Z);
-    else tmp.set(0, 1.8, START_Z);
+    tmp.set(0, 1.8, START_Z);
     tmp.project(tmpCam);
     app.style.setProperty("--px", `${((tmp.x * 0.5 + 0.5) * W).toFixed(1)}px`);
     app.style.setProperty("--py", `${((-tmp.y * 0.5 + 0.5) * H).toFixed(1)}px`);
     app.classList.toggle("wr-tall", !wide);
   }
+  let dartsOn = false; // at the dartboard, throwing
+  const baseFov = () => (W / H < 1 ? 74 : 58);
   function resize() {
     W = app.clientWidth || 1;
     H = app.clientHeight || 1;
     renderer.setSize(W, H, false);
     camera.aspect = W / H;
-    camera.fov = W / H < 1 ? 74 : 58;
+    if (!dartsOn) camera.fov = baseFov();
     camera.updateProjectionMatrix();
     shared.uScale.value = H * renderer.getPixelRatio() * 0.5;
     shared.uMaxPx.value = 5.5 * renderer.getPixelRatio();
@@ -696,9 +725,144 @@ export function createGame(opts: GameOptions): Game | null {
     auto = { id, t: 0 };
   }
   /** Open an item if you are standing at it, otherwise walk over to it first. */
+  /* ---------- darts ----------
+     Opening the dartboard does not open a sheet. The view zooms in on the board
+     and you throw at it: the aim follows the mouse (or your finger), your hand
+     is never quite still, and a click lets the dart go. */
+  const board = byId.get("darts")!;
+  // the board's centre in the room, and the directions across it and out of it
+  const bOut = new THREE.Vector3(Math.sin(board.rot), 0, Math.cos(board.rot));
+  const bRight = new THREE.Vector3(Math.cos(board.rot), 0, -Math.sin(board.rot)); // your right as you face it
+  const bC = new THREE.Vector3(board.at[0], BOARD_Y, board.at[1]).addScaledVector(bOut, BOARD_OUT);
+  const bPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(bOut, bC);
+  const MM = BOARD_R / BOARD_MM; // metres per millimetre of board
+  const AIM_MAX = BOARD_R * 1.5;
+  const ray = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+  const hitP = new THREE.Vector3();
+  let dartHits: DartHit[] = [];
+  const aimAt = { u: 0, v: 0 }; // metres across and up from the centre of the board
+  const shake = { u: 0, v: 0 };
+  let dartsT = 0;
+  type Dart = { obj: THREE.Points; from: THREE.Vector3; to: THREE.Vector3; t: number; hit: DartHit };
+  let darts: Dart[] = [];
+  const dartShape: number[] = [];
+  {
+    // point at the origin, shaft and flights trailing back toward the thrower
+    for (let i = 0; i < 90; i++) dartShape.push(gauss() * 0.003, gauss() * 0.003, rnd() * 0.15);
+    for (let i = 0; i < 80; i++) {
+      const z = 0.11 + rnd() * 0.05, w = (z - 0.1) * 0.5;
+      if (i % 2) dartShape.push((rnd() * 2 - 1) * w, gauss() * 0.002, z);
+      else dartShape.push(gauss() * 0.002, (rnd() * 2 - 1) * w, z);
+    }
+  }
+  const sendDarts = () =>
+    opts.onDarts(
+      dartsOn
+        ? { hits: dartHits.slice(), total: dartHits.reduce((sum, h) => sum + h.points, 0), left: DARTS_PER_ROUND - dartHits.length }
+        : null,
+    );
+  function clearDarts() {
+    for (const d of darts) {
+      scene.remove(d.obj);
+      d.obj.geometry.dispose();
+      (d.obj.material as THREE.Material).dispose();
+    }
+    darts = [];
+    dartHits = [];
+  }
+  function enterDarts() {
+    if (dartsOn || paused || state !== "play") return;
+    dartsOn = true;
+    clearDarts();
+    aimAt.u = aimAt.v = 0;
+    keys = {};
+    auto = null;
+    app.classList.add("wr-darts-on");
+    sendDarts();
+  }
+  function leaveDarts() {
+    if (!dartsOn) return;
+    dartsOn = false;
+    app.classList.remove("wr-darts-on");
+    sendDarts();
+  }
+  /** Aim at where a point on the screen falls on the board. */
+  function aimFromScreen(x: number, y: number) {
+    ndc.set((x / W) * 2 - 1, -(y / H) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    if (!ray.ray.intersectPlane(bPlane, hitP)) return;
+    hitP.sub(bC);
+    aimAt.u = Math.max(-AIM_MAX, Math.min(AIM_MAX, hitP.dot(bRight)));
+    aimAt.v = Math.max(-AIM_MAX, Math.min(AIM_MAX, hitP.y));
+  }
+  function throwDart() {
+    if (!dartsOn || darts.some((d) => d.t < 1)) return;
+    if (dartHits.length >= DARTS_PER_ROUND) {
+      // round over: the next click starts a new one
+      clearDarts();
+      sendDarts();
+      return;
+    }
+    const u = aimAt.u + shake.u, v = aimAt.v + shake.v;
+    const to = bC.clone().addScaledVector(bRight, u).add(new THREE.Vector3(0, v, 0));
+    const obj = dust(dartShape, 0.012);
+    obj.rotation.y = board.rot;
+    const from = camera.position.clone().add(new THREE.Vector3(0, -0.28, 0)).addScaledVector(bRight, 0.12);
+    obj.position.copy(from);
+    scene.add(obj);
+    darts.push({ obj, from, to, t: reduced ? 1 : 0, hit: scoreDart(u / MM, v / MM) });
+    if (reduced) landDart(darts[darts.length - 1]);
+  }
+  function landDart(d: Dart) {
+    d.obj.position.copy(d.to);
+    dartHits.push(d.hit);
+    sendDarts();
+  }
+  /** Each frame while you are at the board: hold the view on it, shake, fly the darts. */
+  function playDarts(dt: number) {
+    dartsT += dt;
+    shake.u = (Math.sin(dartsT * 3.1) * 16 + Math.sin(dartsT * 7.3) * 7) * MM;
+    shake.v = (Math.cos(dartsT * 2.3) * 16 + Math.sin(dartsT * 6.1) * 7) * MM;
+    // stand square in front of the board and look straight at it
+    const sx = board.at[0] + bOut.x * 2.7, sz = board.at[1] + bOut.z * 2.7;
+    const k = Math.min(1, dt * 6);
+    pos.x += (sx - pos.x) * k;
+    pos.z += (sz - pos.z) * k;
+    yaw += turnTo(board.rot, yaw) * k;
+    pitch += (Math.atan2(BOARD_Y - EYE, 2.7) - pitch) * k;
+    for (const d of darts) {
+      if (d.t >= 1) continue;
+      d.t = Math.min(1, d.t + dt / 0.24);
+      d.obj.position.lerpVectors(d.from, d.to, d.t);
+      d.obj.position.y += Math.sin(d.t * Math.PI) * 0.06; // a little arc
+      if (d.t >= 1) landDart(d);
+    }
+    if (!locked && mouse.over) aimFromScreen(mouse.x, mouse.y);
+    // the aim, shake and all, on screen
+    hitP.copy(bC).addScaledVector(bRight, aimAt.u + shake.u);
+    hitP.y += aimAt.v + shake.v;
+    hitP.project(camera);
+    app.style.setProperty("--ax", `${((hitP.x * 0.5 + 0.5) * W).toFixed(1)}px`);
+    app.style.setProperty("--ay", `${((-hitP.y * 0.5 + 0.5) * H).toFixed(1)}px`);
+  }
+  /** Ease the lens: long for the dartboard, normal everywhere else. */
+  function zoom(dt: number) {
+    const want = dartsOn ? (W / H < 1 ? 40 : 29) : baseFov();
+    if (Math.abs(camera.fov - want) < 0.05) return;
+    camera.fov += (want - camera.fov) * Math.min(1, dt * 5);
+    camera.updateProjectionMatrix();
+    // keep the dust the same size on screen as the lens changes
+    const t = (f: number) => Math.tan((f * Math.PI) / 360);
+    shared.uScale.value = (H * renderer.getPixelRatio() * 0.5 * t(58)) / t(camera.fov) * (t(baseFov()) / t(58));
+  }
+  /** Shortest way round from angle `b` to angle `a`. */
+  const turnTo = (a: number, b: number) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+  const open = (id: ThingId) => (id === "darts" ? enterDarts() : opts.onOpen(id));
+
   function activate(t: Live) {
     if (state !== "play" || paused) return;
-    if (Math.hypot(pos.x - t.at[0], pos.z - t.at[1]) - t.r < REACH) opts.onOpen(t.id);
+    if (Math.hypot(pos.x - t.at[0], pos.z - t.at[1]) - t.r < REACH) open(t.id);
     else walkTo(t.id);
   }
   const angDiff = (a: number, b: number) => {
@@ -711,6 +875,14 @@ export function createGame(opts: GameOptions): Game | null {
   const onKeyDown = (e: KeyboardEvent) => {
     if (state !== "play" || paused) return;
     const k = keyName(e);
+    if (dartsOn) {
+      if (k === " " || k === "Enter") {
+        throwDart();
+        e.preventDefault();
+        return;
+      }
+      leaveDarts(); // any other key, walking included, steps away from the board
+    }
     const n = NAV[Number(k) - 1];
     if (n) {
       walkTo(n.id);
@@ -772,6 +944,12 @@ export function createGame(opts: GameOptions): Game | null {
   };
   const onMouseMove = (e: MouseEvent) => {
     if (!locked || state !== "play" || paused || auto || cine) return;
+    if (dartsOn) {
+      // at the board the mouse moves the aim, not the view
+      aimAt.u = Math.max(-AIM_MAX, Math.min(AIM_MAX, aimAt.u + e.movementX * 0.0009));
+      aimAt.v = Math.max(-AIM_MAX, Math.min(AIM_MAX, aimAt.v - e.movementY * 0.0009));
+      return;
+    }
     yaw -= e.movementX * 0.0022;
     const want = pitch - e.movementY * 0.0022;
     pitch = Math.max(-1.2, Math.min(CEILING, want));
@@ -796,7 +974,7 @@ export function createGame(opts: GameOptions): Game | null {
   let wheelPush = 0;
   let hover: Live | null = null;
   let lastCx = -1, lastCy = -1;
-  const DEAD = 0.28; // middle of the screen where the view rests (only if the mouse cannot be captured)
+  const DEAD = 0.66; // how far toward a side the free cursor has to be before the view turns
 
   const center = new THREE.Vector3();
   /* Where an item is on screen: its centre and half its size, in pixels. */
@@ -862,6 +1040,17 @@ export function createGame(opts: GameOptions): Game | null {
 
   const onPointerDown = (e: PointerEvent) => {
     if (state !== "play" || paused) return;
+    if (dartsOn) {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      // aim where you pressed (unless the mouse is captured, then it is already aimed)
+      if (!locked) {
+        const r = canvas.getBoundingClientRect();
+        aimFromScreen(e.clientX - r.left, e.clientY - r.top);
+        if (e.pointerType === "mouse") trackMouse(e);
+      }
+      throwDart();
+      return;
+    }
     if (e.pointerType === "mouse") {
       if (e.button !== 0) return;
       if (!locked && !lockFailed) {
@@ -923,6 +1112,7 @@ export function createGame(opts: GameOptions): Game | null {
     }
   };
   const onPointerEnd = (e: PointerEvent) => {
+    if (dartsOn) return;
     if (e.pointerType === "mouse") {
       // a quick click (not a hold) on an item walks you to it
       if (mouse.down && mouse.held < 0.3 && !mouse.dragged && state === "play" && !paused) {
@@ -966,7 +1156,10 @@ export function createGame(opts: GameOptions): Game | null {
 
   function play(dt: number) {
     let moving = 0;
-    if (cine) {
+    zoom(dt);
+    if (dartsOn && !paused) {
+      playDarts(dt);
+    } else if (cine) {
       cine.t += dt;
       const t = cine.t;
       if (t < 1.9) pitch = cine.from + (LOOK_DOWN - cine.from) * ease(t / 0.7);
@@ -995,7 +1188,7 @@ export function createGame(opts: GameOptions): Game | null {
         if ((d <= 0.12 && Math.abs(angDiff(faceThing, yaw)) < 0.07) || auto.t > 12) {
           const id = auto.id;
           auto = null;
-          opts.onOpen(id);
+          open(id);
         }
       } else {
         if (mouse.down) {
@@ -1080,13 +1273,13 @@ export function createGame(opts: GameOptions): Game | null {
       play(dt);
       if (!paused) {
         const at = aim();
-        const h = mouse.down ? hover : locked || mouse.over ? pick(at.x, at.y) : null;
+        const h = dartsOn ? null : mouse.down ? hover : locked || mouse.over ? pick(at.x, at.y) : null;
         if (h !== hover) {
           hover = h;
           canvas.style.cursor = h && !locked ? "pointer" : "";
           app.classList.toggle("wr-aim", !!h);
         }
-        const f = hover ?? near;
+        const f = dartsOn ? null : hover ?? near;
         if (f !== focus) {
           focus = f;
           opts.onFocus(f ? f.id : null);
@@ -1118,7 +1311,11 @@ export function createGame(opts: GameOptions): Game | null {
       introT = 0;
       setState("intro");
     },
-    walkTo,
+    walkTo(id) {
+      leaveDarts();
+      walkTo(id);
+    },
+    leaveDarts,
     say() {
       audio.say();
     },

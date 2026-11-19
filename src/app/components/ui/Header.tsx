@@ -71,7 +71,7 @@ const Header = () => {
       <div className="absolute right-6 flex items-center space-x-3">
         <ThemeToggle />
         <Link
-          href="/play"
+          href="/"
           className="w-28 text-center px-4 py-1 rounded-full bg-[#e5372c] text-white hover:opacity-90  hover:ring-2 hover:ring-offset-2 hover:ring-[#e5372c] transition"
         >
           Play

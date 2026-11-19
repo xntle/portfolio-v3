@@ -141,31 +141,6 @@ const EXPERIENCE: Entry[] = [
   },
 ];
 
-const ARCHIVE: Entry[] = [
-  {
-    title: "rizzGPT",
-    date: "Completed",
-    tags: ["React/NextJS", "Firebase", "Pinecone", "LangChain", "OpenAI"],
-    links: [
-      ["Website", "https://rizzgpt.thaianle.com/auth"],
-      ["Source", "https://github.com/xntle/rizz-gpt"],
-    ],
-  },
-  { title: "happyjar", date: "In progress", tags: ["React Native", "PostgreSQL", "Supabase"] },
-  {
-    title: "ineedtolockin.com",
-    date: "In progress",
-    tags: ["TypeScript", "Next.JS"],
-    links: [["Source", "https://github.com/xntle/ineedtolockin"]],
-  },
-];
-
-const STACK: [string, string][] = [
-  ["Languages", "C/C++, C#, Python, Java, JavaScript, TypeScript, HTML/CSS"],
-  ["Frameworks", "React.js, React Native, Next.js, Svelte, SvelteKit, Express.js, Django, Hono"],
-  ["Tools", "Node.js, Git, Docker, SSH, PostgreSQL, SQLite, MongoDB, Firebase, Drizzle ORM, R2, AWS"],
-];
-
 const SOCIALS: LinkT[] = [
   ["resume", "https://drive.google.com/drive/folders/12cTsJccyvpVwrejRO2R2o7JuhABW4uVC?usp=sharing"],
   ["linkedin", "https://www.linkedin.com/in/thai-an-le/"],
@@ -176,11 +151,10 @@ const SOCIALS: LinkT[] = [
 
 const STORIES = {
   whiteboard:
-    "When people ask me what I've been working on I show them my whiteboard. Right now? I'm working on this exciting app called Photato, check out my github :-)",
+    "When people ask me what I've been working on I show them my whiteboard.",
   bookshelf:
     "I'm currently reading The Third Door by Alex Banayan. He said life, like a nightclub, has three ways in: the front door, the VIP entrance, and the third door you fight to find yourself.",
   door: "Please take your shoes off. This is an asian household.",
-  desk: "Where things get built. Four I'd show you first.",
   contact: "Feel free to reach out. I'd love to connect, collaborate, or just say hi 👋",
   passport: [
     "On Dec 21, 2021, I landed in the US. I got into UC Davis for mathematics.",
@@ -197,7 +171,6 @@ const STORIES = {
     "The marks never disappeared. Friends still ask, “What happened there?” and I tell them, and we laugh, and I don’t hide the leaf anymore. There’s freedom in leaving the evidence visible. It reminds me that progress is not the same thing as erasure.",
   ],
   ukulele: ["I don't want to set the world on fyaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "Ok get outtax here"],
-  clock: ["TIME IS RUNNING OUT, DO THAT THING YOU ALWAYS WANTED TO DO AND DIDN'T HAVE THE CHANCE TO!"],
   celsius: [
     "Oh... this demonic drink.",
     "I left it there after my last hackathon; I pulled an all-nighter to finish, then another to take my midterm the next morning.",
@@ -316,20 +289,18 @@ function YearClock() {
           );
         })}
       </div>
-      <Story lines={STORIES.clock} />
     </>
   );
 }
 
-export type Sheet = { kicker: string; title: string; body: ReactNode };
+export type Sheet = { title: string; body: ReactNode };
 
-export const SHEETS: Record<ThingId, Sheet> = {
+/** Everything you can open has a sheet, except the dartboard: that is a game in the room. */
+export const SHEETS: Record<Exclude<ThingId, "darts">, Sheet> = {
   desk: {
-    kicker: "The desk",
     title: "Projects",
     body: (
       <>
-        <Say>{STORIES.desk}</Say>
         {PROJECTS.map((e) => (
           <Item key={e.title} e={e} />
         ))}
@@ -337,7 +308,6 @@ export const SHEETS: Record<ThingId, Sheet> = {
     ),
   },
   whiteboard: {
-    kicker: "The whiteboard",
     title: "Experience",
     body: (
       <>
@@ -349,20 +319,14 @@ export const SHEETS: Record<ThingId, Sheet> = {
     ),
   },
   bookshelf: {
-    kicker: "The bookshelf",
-    title: "Archive & stack",
+    title: "Bookshelf",
     body: (
       <>
         <Say>{STORIES.bookshelf}</Say>
-        {ARCHIVE.map((e) => (
-          <Item key={e.title} e={e} />
-        ))}
-        <Rows rows={STACK} />
       </>
     ),
   },
   passport: {
-    kicker: "The passport",
     title: "About",
     body: (
       <>
@@ -387,7 +351,6 @@ export const SHEETS: Record<ThingId, Sheet> = {
     ),
   },
   door: {
-    kicker: "The door",
     title: "Contact",
     body: (
       <>
@@ -403,9 +366,9 @@ export const SHEETS: Record<ThingId, Sheet> = {
       </>
     ),
   },
-  monstera: { kicker: "Story", title: "The monstera from Costco", body: <Story lines={STORIES.monstera} /> },
-  ukulele: { kicker: "Story", title: "The ukulele", body: <Story lines={STORIES.ukulele} /> },
-  clock: { kicker: "The wall clock", title: `${new Date().getFullYear()} ends in`, body: <YearClock /> },
-  celsius: { kicker: "Story", title: "Crushed Celsius", body: <Story lines={STORIES.celsius} /> },
-  bed: { kicker: "Story", title: "The bed", body: <Story lines={STORIES.bed} /> },
+  monstera: { title: "The monstera from Costco", body: <Story lines={STORIES.monstera} /> },
+  ukulele: { title: "The ukulele", body: <Story lines={STORIES.ukulele} /> },
+  clock: { title: `${new Date().getFullYear()} ends in`, body: <YearClock /> },
+  celsius: { title: "Crushed Celsius", body: <Story lines={STORIES.celsius} /> },
+  bed: { title: "The bed", body: <Story lines={STORIES.bed} /> },
 };

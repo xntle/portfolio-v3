@@ -34,26 +34,25 @@
 
 /* ---------- title ----------
    A line runs out of the figure's head (--px/--py, set by the game) to what it says. */
-.wr-title { --w: min(400px, 36vw); --line: clamp(40px, 6vw, 96px); position: absolute; left: max(var(--gl), calc(var(--px, 60%) - var(--line) - var(--w) - 14px)); top: calc(var(--py, 40%) - 20px); width: var(--w); display: flex; flex-direction: column; gap: 22px; align-items: flex-start; transition: opacity .5s ease; }
-.wr-says { position: relative; display: flex; flex-direction: column; gap: 10px; background: var(--paper); box-shadow: 0 0 0 14px var(--paper); }
-.wr-says::after { content: ""; position: absolute; left: calc(100% + 14px); top: 20px; width: var(--line); height: 1px; background: var(--ink); }
+/* the words sit on the figure's head, with a short line going down into it */
+.wr-title { position: absolute; left: var(--gl); right: var(--gr); bottom: calc(100% - var(--py, 40%) + 38px); display: flex; flex-direction: column; align-items: center; text-align: center; pointer-events: none; transition: opacity .5s ease; }
+.wr[data-state="title"] .wr-title > * { pointer-events: auto; }
+.wr-says { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.wr-says::after { content: ""; position: absolute; left: 50%; top: calc(100% + 8px); width: 1px; height: 22px; background: var(--ink); }
 .wr-title h1 { font-size: clamp(30px, 3.4vw, 44px); line-height: 1; font-weight: 500; letter-spacing: -.04em; margin: 0; }
 .wr-lede { margin: 0; color: var(--ink-2); font-size: clamp(16px, 1.5vw, 19px); line-height: 1.4; letter-spacing: -.01em; text-wrap: pretty; }
-.wr-contact { margin: 6px 0 0; display: flex; gap: 6px; }
-.wr-contact a { display: grid; place-items: center; width: 36px; height: 36px; margin-left: -9px; font-size: 18px; color: var(--ink-2); transition: color .15s ease; }
-.wr-contact a + a { margin-left: 0; }
+.wr .wr-lede a { color: var(--ink); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.wr .wr-lede a:hover { text-decoration-thickness: 2px; }
+.wr-contact { margin: 2px 0 0; display: flex; gap: 6px; }
+.wr-contact a { display: grid; place-items: center; width: 36px; height: 36px; font-size: 18px; color: var(--ink-2); transition: color .15s ease; }
 .wr-contact a:hover { color: var(--ink); }
-.wr-tall .wr-contact a { margin-left: 0; }
 .wr-start { background: var(--ink); color: var(--paper) !important; border: 0; border-radius: 2px; padding: 15px 22px 15px 24px; font-family: var(--font-mono) !important; font-size: 12px !important; letter-spacing: .14em; text-transform: uppercase; display: flex; gap: 28px; align-items: center; }
 .wr-start span { transition: transform .2s ease; }
 .wr-start:hover span { transform: translateX(5px); }
 .wr:not([data-state="title"]) .wr-title { opacity: 0; pointer-events: none; }
-/* tall screens: the line goes straight up from the head, Start sits at the bottom */
-.wr-tall .wr-title { --w: auto; left: var(--gl); right: var(--gr); width: auto; top: auto; bottom: calc(100% - var(--py, 30%) + 54px); align-items: center; text-align: center; }
-.wr-tall .wr-says { align-items: center; }
-.wr-tall .wr-says::after { left: 50%; top: calc(100% + 10px); width: 1px; height: 36px; }
-.wr-tall .wr-lede { max-width: 30ch; }
-.wr-tall .wr-start { position: fixed; left: var(--gl); right: var(--gr); bottom: calc(28px + env(safe-area-inset-bottom, 0px)); justify-content: space-between; }
+.wr-lede { max-width: 34ch; }
+.wr-title .wr-start { position: fixed; left: 50%; bottom: calc(clamp(28px, 9vh, 84px) + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); }
+.wr-tall .wr-title .wr-start { left: var(--gl); right: var(--gr); transform: none; bottom: calc(28px + env(safe-area-inset-bottom, 0px)); justify-content: space-between; }
 
 /* ---------- HUD ---------- */
 .wr-hud { transition: opacity .5s ease; }
@@ -104,6 +103,7 @@
 .wr-sheet > header, .wr-sheet > footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .wr-sheet > footer { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--line); }
 .wr-tbtn { background: none; border: 0; padding: 6px 0; font-family: var(--font-mono) !important; font-size: 11px !important; letter-spacing: .1em; text-transform: uppercase; display: inline-flex; gap: 8px; align-items: center; }
+.wr-x span { font-size: 15px; line-height: 1; letter-spacing: 0; }
 .wr-tbtn:hover { text-decoration: underline; text-underline-offset: 4px; }
 .wr-sheet h2 { font-size: 34px; line-height: 1.05; font-weight: 500; letter-spacing: -.035em; margin: 6px 0 0; text-wrap: balance; }
 .wr-body { display: flex; flex-direction: column; gap: 16px; }
@@ -133,6 +133,20 @@
 @keyframes wr-today { 50% { background: transparent; } }
 .wr-nogl { position: absolute; left: var(--gl); right: var(--gr); top: 64px; margin: 0; color: var(--ink-2); }
 
+/* ---------- darts: played in the room, zoomed in on the board ---------- */
+.wr-reticle { position: absolute; left: 0; top: 0; width: 44px; height: 44px; margin: -22px 0 0 -22px; transform: translate(var(--ax, 50vw), var(--ay, 50vh)); pointer-events: none; border: 1.5px solid var(--ink); border-radius: 50%; background: color-mix(in srgb, var(--paper) 40%, transparent); }
+.wr-reticle::before, .wr-reticle::after { content: ""; position: absolute; left: 50%; top: 50%; background: var(--ink); }
+.wr-reticle::before { width: 1.5px; height: 62px; margin: -31px 0 0 -.75px; }
+.wr-reticle::after { height: 1.5px; width: 62px; margin: -.75px 0 0 -31px; }
+.wr-dartsbar { position: absolute; z-index: 3; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); width: min(560px, calc(100% - var(--gl) - var(--gr))); background: var(--sheet); border: 1px solid var(--ink) !important; padding: 10px 14px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 6px 18px; pointer-events: none; }
+.wr-dartsbar .wr-count { flex-wrap: nowrap; gap: 14px; }
+.wr-dartsbar .wr-count b { font-size: 24px; }
+.wr-dartsbar p { margin: 0; }
+.wr-dartsbar .wr-tbtn { pointer-events: auto; }
+@media (max-width: 640px) { .wr-dartsbar { grid-template-columns: 1fr auto; } .wr-dartsbar p:not(.wr-count) { grid-column: 1 / -1; grid-row: 2; } }
+.wr-darts-on .wr-bottom, .wr-darts-on .wr-cross, .wr-darts-on .wr-sound { display: none; }
+.wr-darts-on .wr-cv { cursor: none; }
+
 @media (max-width: 640px) {
   .wr-top { grid-template-columns: 1fr auto; }
   .wr-nav { grid-row: 2; grid-column: 1 / -1; justify-content: space-between; gap: 8px; max-width: 340px; width: 100%; justify-self: center; }
@@ -144,9 +158,10 @@
   .wr-sheet ~ .wr-nogl { display: none; }
 }
 @media (max-height: 700px) {
-  .wr-tall .wr-title { bottom: auto; top: calc(56px + env(safe-area-inset-top, 0px)); }
-  .wr-tall .wr-says { gap: 6px; }
-  .wr-tall .wr-says::after { height: 18px; }
+  /* short screens: not enough room above the head, so pin the words under the bar */
+  .wr-title { bottom: auto; top: calc(52px + env(safe-area-inset-top, 0px)); }
+  .wr-says { gap: 4px; background: var(--paper); box-shadow: 0 0 0 10px var(--paper); }
+  .wr-says::after { display: none; }
 }
 @keyframes wr-sheet-up { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {

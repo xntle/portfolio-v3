@@ -7,6 +7,7 @@ import { FaEnvelope, FaGithub, FaLinkedin } from "react-icons/fa";
 import { createUISFX, type CueName, type UISFXPlayer } from "uisfx";
 import { createGame, type Game, type GameState } from "./game";
 import { NAV, ROOM, type ThingId } from "./room";
+import type { DartsState } from "./darts";
 import { SHEETS } from "./content";
 import "./play.css";
 
@@ -29,6 +30,10 @@ const CONTACT = [
   { label: "GitHub", href: "https://github.com/xntle", Icon: FaGithub },
 ];
 
+const DARTS_BEST = "an-room:darts-best";
+// the dartboard is a game in the room, not a sheet, so the tour of sheets skips it
+const TOUR = ROOM.filter((t) => t.id !== "darts");
+
 const short = (id: ThingId) => ROOM.find((t) => t.id === id)?.short ?? id;
 
 export default function WhiteRoom() {
@@ -50,6 +55,8 @@ export default function WhiteRoom() {
   const [coarse, setCoarse] = useState(false);
   const [muted, setMuted] = useState(false);
   const [locked, setLocked] = useState(false);
+  const [darts, setDarts] = useState<DartsState | null>(null);
+  const [best, setBest] = useState(0);
   const [shoesOff, setShoesOff] = useState(false);
   const [anger, setAnger] = useState(0);
   const shoesRef = useRef<HTMLButtonElement>(null);
@@ -73,7 +80,7 @@ export default function WhiteRoom() {
       sfxRef.current = null;
       void ui.destroy();
     };
-    const game = createGame({ app, canvas, stick, onState: setState, onFocus: setFocus, onOpen: setPanel, onLock: setLocked });
+    const game = createGame({ app, canvas, stick, onState: setState, onFocus: setFocus, onOpen: setPanel, onLock: setLocked, onDarts: setDarts });
     if (!game) {
       // no WebGL: skip the room, the nav still opens every section
       setNoGL(true);
@@ -81,6 +88,8 @@ export default function WhiteRoom() {
       return stopSfx;
     }
     gameRef.current = game;
+    // development only: lets a test script walk straight to an item
+    if (process.env.NODE_ENV !== "production") (window as unknown as { __room?: Game }).__room = game;
     return () => {
       game.dispose();
       gameRef.current = null;
@@ -92,6 +101,29 @@ export default function WhiteRoom() {
   useEffect(() => {
     if (focus && state === "play") sfx("hover");
   }, [focus, state, sfx]);
+  // darts: a tick for each dart that lands, and the best round is remembered
+  useEffect(() => {
+    try {
+      setBest(Number(window.localStorage.getItem(DARTS_BEST)) || 0);
+    } catch {
+      // private window: no best score kept
+    }
+  }, []);
+  const dartCount = darts?.hits.length ?? 0;
+  useEffect(() => {
+    if (!darts || !dartCount) return;
+    const last = darts.hits[dartCount - 1];
+    sfx(last.points >= 25 ? "success" : last.points ? "select" : "cancel");
+    if (darts.left === 0 && darts.total > best) {
+      setBest(darts.total);
+      try {
+        window.localStorage.setItem(DARTS_BEST, String(darts.total));
+      } catch {
+        // not kept
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per dart that lands
+  }, [dartCount]);
   const hadPanel = useRef(false);
   useEffect(() => {
     if (panel) sfx("open");
@@ -139,7 +171,10 @@ export default function WhiteRoom() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key === "Escape") {
+        close();
+        gameRef.current?.leaveDarts();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -156,9 +191,9 @@ export default function WhiteRoom() {
     game.walkTo(id);
   };
 
-  const sheet = panel ? SHEETS[panel] : null;
-  const index = panel ? ROOM.findIndex((t) => t.id === panel) : -1;
-  const next = index >= 0 ? ROOM[(index + 1) % ROOM.length] : null;
+  const sheet = panel && panel !== "darts" ? SHEETS[panel] : null;
+  const index = panel ? TOUR.findIndex((t) => t.id === panel) : -1;
+  const next = index >= 0 ? TOUR[(index + 1) % TOUR.length] : null;
 
   return (
     <div
@@ -170,11 +205,11 @@ export default function WhiteRoom() {
         ref={canvasRef}
         className="wr-cv"
         tabIndex={0}
-        aria-label="A white room with a desk, whiteboard, bookshelf, passport, door, monstera, ukulele, wall clock, crushed can and bed"
+        aria-label="A white room with a desk, whiteboard, bookshelf, passport, door, monstera, ukulele, wall clock, dartboard, crushed can and bed"
       />
 
       <div className="wr-top">
-        <Link href="/" className="wr-name" aria-label="Thai An (An) Le, back to home">
+        <Link href="/classic" className="wr-name" aria-label="Thai An (An) Le, the classic portfolio" title="Classic portfolio">
           Thai An (An) Le
         </Link>
         <nav className="wr-nav wr-hud" aria-label="Sections">
@@ -207,7 +242,17 @@ export default function WhiteRoom() {
       <section className="wr-title">
         <div className="wr-says">
           <h1>{"hi, i'm an."}</h1>
-          <p className="wr-lede">{"i'm working for play anything as a product engineer."}</p>
+          <p className="wr-lede">
+            {"i am a product engineer at "}
+            <a href="https://playanything.com" target="_blank" rel="noopener noreferrer">
+              play anything
+            </a>
+            {", and shipping "}
+            <a href="https://breakfree.you" target="_blank" rel="noopener noreferrer">
+              my app
+            </a>
+            {" on the weekend."}
+          </p>
           <p className="wr-contact">
             {CONTACT.map(({ label, href, Icon }) => (
               <a key={label} href={href} aria-label={label} title={label} {...(href.startsWith("mailto:") ? {} : { target: "_blank", rel: "noopener noreferrer" })}>
@@ -243,7 +288,36 @@ export default function WhiteRoom() {
 
       <i className="wr-cross" aria-hidden="true" />
       {/* the Open prompt rides on the cursor */}
-      {!coarse && focus && !panel && !gate && state === "play" && (
+      {darts && !panel && (
+        <>
+          <i className="wr-reticle" aria-hidden="true" />
+          <div className="wr-dartsbar" role="status">
+            <p className="wr-count">
+              <span>
+                <b>{darts.total}</b> points
+              </span>
+              <span>
+                <b>{darts.left}</b> darts left
+              </span>
+              <span>
+                <b>{best}</b> best
+              </span>
+            </p>
+            <p>
+              {darts.left === 0
+                ? `${darts.total} with three darts${darts.total > 0 && darts.total >= best ? ". That's your best" : ""}. ${coarse ? "Tap" : "Click"} to throw again.`
+                : dartCount
+                  ? `${darts.hits[dartCount - 1].label}${darts.hits[dartCount - 1].points ? `, ${darts.hits[dartCount - 1].points}` : ""}.`
+                  : `Your hand shakes. Line it up and ${coarse ? "tap" : "click"} to throw.`}
+            </p>
+            <button className="wr-tbtn" type="button" onClick={() => gameRef.current?.leaveDarts()}>
+              <span aria-hidden="true">✕</span> Leave {!coarse && <kbd>W A S D</kbd>}
+            </button>
+          </div>
+        </>
+      )}
+
+      {!coarse && focus && !panel && !gate && !darts && state === "play" && (
         <span className="wr-prompt" aria-live="polite">
           Open <b>{short(focus)}</b> <kbd>click</kbd>
         </span>
@@ -271,16 +345,15 @@ export default function WhiteRoom() {
       {sheet && panel && (
         <aside key={panel} className="wr-sheet" role="dialog" aria-labelledby="wr-sheet-title">
           <header>
-            <span className="wr-mono">{sheet.kicker}</span>
-            <button ref={closeRef} className="wr-tbtn" type="button" onClick={close}>
-              Close <kbd>Esc</kbd>
+            <button ref={closeRef} className="wr-tbtn wr-x" type="button" aria-label="Close" onClick={close}>
+              <span aria-hidden="true">✕</span> <kbd>Esc</kbd>
             </button>
           </header>
           <h2 id="wr-sheet-title">{sheet.title}</h2>
           <div className="wr-body">{sheet.body}</div>
           <footer>
             <span className="wr-mono">
-              {index + 1} / {ROOM.length}
+              {index + 1} / {TOUR.length}
             </span>
             {next && (
               <button className="wr-tbtn" type="button" onClick={() => go(next.id)}>
