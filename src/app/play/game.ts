@@ -745,6 +745,8 @@ export function createGame(opts: GameOptions): Game | null {
   let locked = false;
   let everLocked = false;
   const CEILING = 0.62; // radians: how far up you can look
+  const PUSH_FREE = 0.3; // radians of pushing past the ceiling before the mouse is freed
+  let pushedUp = 0;
   let lockFailed = typeof canvas.requestPointerLock !== "function";
   const finePointer = window.matchMedia("(pointer: fine)").matches;
   const lock = () => {
@@ -771,8 +773,18 @@ export function createGame(opts: GameOptions): Game | null {
   const onMouseMove = (e: MouseEvent) => {
     if (!locked || state !== "play" || paused || auto || cine) return;
     yaw -= e.movementX * 0.0022;
-    // the ceiling is as far up as you can look
-    pitch = Math.max(-1.2, Math.min(CEILING, pitch - e.movementY * 0.0022));
+    const want = pitch - e.movementY * 0.0022;
+    pitch = Math.max(-1.2, Math.min(CEILING, want));
+    // The ceiling is as far up as you can look. Keep pushing against it and the
+    // mouse is let go, so it can reach the links at the top. While it is free
+    // the view follows the cursor (see play()), so you are never stuck.
+    if (want > CEILING) {
+      pushedUp += want - CEILING;
+      if (pushedUp > PUSH_FREE) {
+        pushedUp = 0;
+        document.exitPointerLock();
+      }
+    } else if (e.movementY > 0) pushedUp = 0;
   };
   document.addEventListener("pointerlockchange", onLockChange);
   document.addEventListener("pointerlockerror", onLockError);
@@ -990,7 +1002,8 @@ export function createGame(opts: GameOptions): Game | null {
           mouse.held += dt;
           if (mouse.held > 0.3) auto = null;
         }
-        if (mouse.over && lockFailed) {
+        // a free cursor still steers: toward the sides turns you, up and down tilts
+        if (mouse.over && !locked) {
           const ax = Math.sign(mouse.nx) * Math.max(0, Math.abs(mouse.nx) - DEAD) / (1 - DEAD);
           yaw -= ax * Math.abs(ax) * 2.0 * dt;
           pitch += (Math.min(CEILING, -mouse.ny * 0.5) - pitch) * Math.min(1, dt * 4);
