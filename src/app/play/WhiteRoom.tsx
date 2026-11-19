@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import { FaEnvelope, FaGithub, FaLinkedin } from "react-icons/fa";
+import { createUISFX, type CueName, type UISFXPlayer } from "uisfx";
 import { createGame, type Game, type GameState } from "./game";
 import { NAV, ROOM, type ThingId } from "./room";
 import { SHEETS } from "./content";
@@ -33,7 +34,11 @@ const short = (id: ThingId) => ROOM.find((t) => t.id === id)?.short ?? id;
 export default function WhiteRoom() {
   const appRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const labelsRef = useRef<HTMLDivElement>(null);
+  // interface sounds: the zen pack from uisfx (paper, brush, wood, quiet chimes)
+  const sfxRef = useRef<UISFXPlayer | null>(null);
+  const sfx = useCallback((cue: CueName) => {
+    sfxRef.current?.play(cue);
+  }, []);
   const stickRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const gameRef = useRef<Game | null>(null);
@@ -53,22 +58,46 @@ export default function WhiteRoom() {
 
   useEffect(() => {
     setCoarse(window.matchMedia("(pointer: coarse)").matches);
-    const app = appRef.current, canvas = canvasRef.current, labels = labelsRef.current;
+    const app = appRef.current, canvas = canvasRef.current;
     const stick = stickRef.current;
-    if (!app || !canvas || !labels || !stick) return;
-    const game = createGame({ app, canvas, labels, stick, onState: setState, onFocus: setFocus, onOpen: setPanel, onLock: setLocked });
+    if (!app || !canvas || !stick) return;
+    const ui = createUISFX({ pack: "zen", volume: 0.6 });
+    sfxRef.current = ui;
+    // browsers only allow sound after the first click or key
+    const unlock = () => void ui.unlock();
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
+    const stopSfx = () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+      sfxRef.current = null;
+      void ui.destroy();
+    };
+    const game = createGame({ app, canvas, stick, onState: setState, onFocus: setFocus, onOpen: setPanel, onLock: setLocked });
     if (!game) {
       // no WebGL: skip the room, the nav still opens every section
       setNoGL(true);
       setState("play");
-      return;
+      return stopSfx;
     }
     gameRef.current = game;
     return () => {
       game.dispose();
       gameRef.current = null;
+      stopSfx();
     };
   }, []);
+
+  // a soft tick when the box locks onto something, paper when a sheet opens or closes
+  useEffect(() => {
+    if (focus && state === "play") sfx("hover");
+  }, [focus, state, sfx]);
+  const hadPanel = useRef(false);
+  useEffect(() => {
+    if (panel) sfx("open");
+    else if (hadPanel.current) sfx("close");
+    hadPanel.current = panel !== null;
+  }, [panel, sfx]);
 
   useEffect(() => {
     gameRef.current?.setPaused(panel !== null || gate, panel !== null);
@@ -78,10 +107,12 @@ export default function WhiteRoom() {
   const takeShoesOff = useCallback(() => {
     gameRef.current?.takeShoesOff();
     setShoesOff(true);
+    sfx("success");
     canvasRef.current?.focus();
-  }, []);
+  }, [sfx]);
   const refuse = () => {
     setAnger((a) => Math.min(SHOES.length - 1, a + 1));
+    sfx("error");
     gameRef.current?.say();
   };
 
@@ -98,6 +129,7 @@ export default function WhiteRoom() {
 
   useEffect(() => {
     gameRef.current?.setMuted(muted);
+    sfxRef.current?.setEnabled(!muted);
   }, [muted]);
 
   const close = useCallback(() => {
@@ -115,6 +147,7 @@ export default function WhiteRoom() {
 
   const go = (id: ThingId) => {
     const game = gameRef.current;
+    sfx("select");
     if (noGL || !game) {
       setPanel(id);
       return;
@@ -140,24 +173,32 @@ export default function WhiteRoom() {
         aria-label="A white room with a desk, whiteboard, bookshelf, passport, door, monstera, ukulele, wall clock, crushed can and bed"
       />
 
-      <div ref={labelsRef} className="wr-labels" />
       <div className="wr-top">
         <Link href="/" className="wr-name" aria-label="Thai An (An) Le, back to home">
           Thai An (An) Le
         </Link>
-        <span className="wr-mono wr-place">San Francisco, CA</span>
-      </div>
-
-      {noGL ? (
-        <nav className="wr-nav" aria-label="Sections">
+        <nav className="wr-nav wr-hud" aria-label="Sections">
           {NAV.map((n) => (
-            <button key={n.id} type="button" onClick={() => go(n.id)}>
+            <button key={n.id} className="wr-mono" type="button" aria-current={panel === n.id ? "page" : undefined} onClick={() => go(n.id)}>
               {n.label}
             </button>
           ))}
         </nav>
-      ) : (
-        <button className="wr-tbtn wr-sound" type="button" aria-pressed={!muted} onClick={() => setMuted((m) => !m)}>
+        <span className="wr-mono wr-place">San Francisco, CA</span>
+      </div>
+
+      {!noGL && (
+        <button
+          className="wr-tbtn wr-sound"
+          type="button"
+          aria-pressed={!muted}
+          onClick={() => {
+            // heard on the way in, and as the last thing on the way out
+            if (muted) sfxRef.current?.setEnabled(true);
+            sfx(muted ? "toggle-on" : "toggle-off");
+            setMuted((m) => !m);
+          }}
+        >
           Sound {muted ? "off" : "on"}
         </button>
       )}
@@ -175,22 +216,26 @@ export default function WhiteRoom() {
             ))}
           </p>
         </div>
-        <button className="wr-start" type="button" onClick={() => gameRef.current?.start()} disabled={state !== "title"}>
+        <button className="wr-start" type="button" onClick={() => {
+            sfx("start");
+            gameRef.current?.start();
+          }}
+          disabled={state !== "title"}>
           Start <span aria-hidden="true">→</span>
         </button>
       </section>
 
       <div className="wr-bottom wr-hud">
         {coarse && focus ? (
-          <button className="wr-open" type="button" onClick={() => setPanel(focus)}>
+          <button className="wr-open" type="button" onClick={() => go(focus)}>
             Open <b>{short(focus)}</b>
           </button>
         ) : (
           <p className="wr-mono wr-hint">
             {coarse
-              ? "Left thumb moves · Right thumb looks · Tap a word"
+              ? "Left thumb moves · Right thumb looks · Walk up to an item"
               : locked
-                ? "Mouse looks · Hold click or W A S D to walk · Click an item or a word · Esc frees the cursor"
+                ? "Mouse looks · Hold click or W A S D to walk · Click an item · Push up past the ceiling or Esc for the menu"
                 : "Click the room to look around with your mouse"}
           </p>
         )}
@@ -249,7 +294,7 @@ export default function WhiteRoom() {
 
       {noGL && (
         <p className="wr-nogl">
-          {"This browser can't draw the 3D room. The links at the bottom still open every section."}
+          {"This browser can't draw the 3D room. The links at the top still open every section."}
         </p>
       )}
     </div>

@@ -11,8 +11,6 @@ export type GameState = "title" | "intro" | "play";
 export type GameOptions = {
   app: HTMLElement;
   canvas: HTMLCanvasElement;
-  /** Container the floating section words are created in. */
-  labels: HTMLElement;
   /** Touch joystick ring; its first child is the knob. */
   stick: HTMLElement;
   onState: (s: GameState) => void;
@@ -35,15 +33,7 @@ export type Game = {
   dispose: () => void;
 };
 
-type Live = Thing & {
-  ap: { x: number; z: number };
-  anchor: THREE.Vector3;
-  /** The section word floating over it, for the four portfolio sections only. */
-  el?: HTMLButtonElement;
-  /** Where that word is on screen right now. */
-  sx: number;
-  sy: number;
-};
+type Live = Thing & { ap: { x: number; z: number } };
 type Mat = THREE.Material;
 type Builder = (g: THREE.Group, m: Mat, ex: number[]) => void;
 
@@ -555,20 +545,8 @@ export function createGame(opts: GameOptions): Game | null {
     stipple(g, t.dens ?? 2600, t.dot ?? 0.03, ex);
     scene.add(g);
 
-    // Items carry no names. Only the four sections get a word floating in the air.
-    const word = NAV.find((n) => n.id === t.id);
-    let el: HTMLButtonElement | undefined;
-    if (word) {
-      el = document.createElement("button");
-      el.type = "button";
-      el.className = "wr-lb";
-      el.textContent = word.label;
-      el.addEventListener("click", () => walkTo(t.id));
-      opts.labels.appendChild(el);
-    }
-
     const d = t.r + (t.stand ?? 1.9); // where you stand to look at it
-    return { ...t, el, sx: 0, sy: 0, ap: { x: x + Math.sin(t.rot) * d, z: z + Math.cos(t.rot) * d }, anchor: new THREE.Vector3(x, t.h + 0.45, z) };
+    return { ...t, ap: { x: x + Math.sin(t.rot) * d, z: z + Math.cos(t.rot) * d } };
   });
   const byId = new Map(things.map((t) => [t.id, t]));
 
@@ -766,6 +744,9 @@ export function createGame(opts: GameOptions): Game | null {
      toward the screen edges instead. Touch keeps the thumb stick below. */
   let locked = false;
   let everLocked = false;
+  const CEILING = 0.62; // radians: how far up you can look
+  const PUSH_FREE = 0.3; // radians of pushing past the ceiling before the mouse is freed
+  let pushedUp = 0;
   let lockFailed = typeof canvas.requestPointerLock !== "function";
   const finePointer = window.matchMedia("(pointer: fine)").matches;
   const lock = () => {
@@ -792,7 +773,17 @@ export function createGame(opts: GameOptions): Game | null {
   const onMouseMove = (e: MouseEvent) => {
     if (!locked || state !== "play" || paused || auto || cine) return;
     yaw -= e.movementX * 0.0022;
-    pitch = Math.max(-1.2, Math.min(1.2, pitch - e.movementY * 0.0022));
+    const want = pitch - e.movementY * 0.0022;
+    pitch = Math.max(-1.2, Math.min(CEILING, want));
+    // The ceiling is as far up as you can look. Keep pushing against it and the
+    // mouse is let go, so it can reach the links at the top.
+    if (want > CEILING) {
+      pushedUp += want - CEILING;
+      if (pushedUp > PUSH_FREE) {
+        pushedUp = 0;
+        document.exitPointerLock();
+      }
+    } else if (e.movementY > 0) pushedUp = 0;
   };
   document.addEventListener("pointerlockchange", onLockChange);
   document.addEventListener("pointerlockerror", onLockError);
@@ -803,31 +794,46 @@ export function createGame(opts: GameOptions): Game | null {
   const mouse = { over: false, x: 0, y: 0, nx: 0, ny: 0, down: false, held: 0, downX: 0, downY: 0, dragged: false };
   let wheelPush = 0;
   let hover: Live | null = null;
-  const DEAD = 0.28; // middle of the screen where the view rests
+  let lastCx = -1, lastCy = -1;
+  const DEAD = 0.28; // middle of the screen where the view rests (only if the mouse cannot be captured)
 
   const center = new THREE.Vector3();
-  function pick(x: number, y: number): Live | null {
-    // pointing at a floating word is as good as pointing at its item
-    for (const t of things) {
-      if (!t.el) continue;
-      const hw = t.el.offsetWidth / 2 + 6, hh = t.el.offsetHeight / 2 + 6;
-      if (Math.abs(x - t.sx) < hw && Math.abs(y - t.sy) < hh) return t;
-    }
-    let best: Live | null = null, bestDepth = Infinity;
+  /* Where an item is on screen: its centre and half its size, in pixels. */
+  const rect = { x: 0, y: 0, rx: 0, ry: 0, dist: 0 };
+  function onScreen(t: Live): boolean {
     const k = H / 2 / Math.tan((camera.fov * Math.PI) / 360);
+    center.set(t.at[0], t.look ?? Math.max(0.15, t.h * 0.5), t.at[1]);
+    rect.dist = center.distanceTo(camera.position);
+    center.project(camera);
+    if (center.z > 1) return false;
+    rect.x = (center.x * 0.5 + 0.5) * W;
+    rect.y = (-center.y * 0.5 + 0.5) * H;
+    rect.rx = Math.max(30, ((t.r + 0.15) * k) / rect.dist);
+    rect.ry = Math.max(30, ((t.h * 0.55 + 0.15) * k) / rect.dist);
+    return true;
+  }
+  /** The item under a point on screen. */
+  function pick(x: number, y: number): Live | null {
+    let best: Live | null = null, bestDepth = Infinity;
     for (const t of things) {
-      center.set(t.at[0], t.look ?? Math.max(0.15, t.h * 0.5), t.at[1]);
-      const dist = center.distanceTo(camera.position);
-      center.project(camera);
-      if (center.z > 1) continue;
-      const sx = (center.x * 0.5 + 0.5) * W, sy = (-center.y * 0.5 + 0.5) * H;
-      const rx = Math.max(30, ((t.r + 0.15) * k) / dist), ry = Math.max(30, ((t.h * 0.55 + 0.15) * k) / dist);
-      if (Math.abs(x - sx) < rx && Math.abs(y - sy) < ry && dist < bestDepth) {
+      if (onScreen(t) && Math.abs(x - rect.x) < rect.rx && Math.abs(y - rect.y) < rect.ry && rect.dist < bestDepth) {
         best = t;
-        bestDepth = dist;
+        bestDepth = rect.dist;
       }
     }
     return best;
+  }
+  function placePrompt() {
+    // the Open prompt rides on the cursor: dead centre when the mouse is captured
+    const at = aim();
+    const pointing = locked || mouse.over;
+    const cx = Math.round(pointing ? at.x : W / 2), cy = Math.round(pointing ? at.y : H / 2);
+    if (cx !== lastCx || cy !== lastCy) {
+      lastCx = cx;
+      lastCy = cy;
+      app.style.setProperty("--cx", `${cx}px`);
+      app.style.setProperty("--cy", `${cy}px`);
+    }
   }
   const trackMouse = (e: PointerEvent) => {
     const r = canvas.getBoundingClientRect();
@@ -910,7 +916,7 @@ export function createGame(opts: GameOptions): Game | null {
       if (knob) knob.style.transform = `translate(${dx * 30}px,${dy * 30}px)`;
     } else {
       yaw -= (x - p.x) * 0.0045;
-      pitch = Math.max(-0.7, Math.min(0.7, pitch - (y - p.y) * 0.0045));
+      pitch = Math.max(-0.7, Math.min(CEILING, pitch - (y - p.y) * 0.0045));
       p.x = x;
       p.y = y;
     }
@@ -943,7 +949,6 @@ export function createGame(opts: GameOptions): Game | null {
   canvas.addEventListener("wheel", onWheel, { passive: false });
 
   /* ---------- loop ---------- */
-  let lastCx = -1, lastCy = -1;
 
   function collide() {
     for (const t of things) {
@@ -999,7 +1004,7 @@ export function createGame(opts: GameOptions): Game | null {
         if (mouse.over && lockFailed) {
           const ax = Math.sign(mouse.nx) * Math.max(0, Math.abs(mouse.nx) - DEAD) / (1 - DEAD);
           yaw -= ax * Math.abs(ax) * 2.0 * dt;
-          pitch += (-mouse.ny * 0.5 - pitch) * Math.min(1, dt * 4);
+          pitch += (Math.min(CEILING, -mouse.ny * 0.5) - pitch) * Math.min(1, dt * 4);
         }
         const walking = mouse.down && mouse.held > 0.3 ? 1 : 0;
         const push = wheelPush * Math.min(1, dt * 8);
@@ -1039,40 +1044,6 @@ export function createGame(opts: GameOptions): Game | null {
     near = bestD < REACH ? best : null;
   }
 
-  /* The section words hang in the air over their items. When an item is off to
-     the side or behind you, its word slides to the edge of the view on that
-     side, so all four are always there to press. */
-  function placeLabels() {
-    camera.updateMatrixWorld();
-    const mx = Math.min(90, W * 0.16), top = 64, bottom = H - 84;
-    for (const t of things) {
-      if (!t.el) continue;
-      tmp.copy(t.anchor).project(camera);
-      let x = (tmp.x * 0.5 + 0.5) * W, y = (-tmp.y * 0.5 + 0.5) * H;
-      const behind = tmp.z > 1;
-      if (behind) {
-        // mirrored by the projection: put it on the side you would turn to
-        x = tmp.x < 0 ? W : 0;
-        y = H / 2;
-      }
-      const cx = Math.max(mx, Math.min(W - mx, x)), cy = Math.max(top, Math.min(bottom, y));
-      t.sx = cx;
-      t.sy = cy;
-      t.el.classList.toggle("wr-pinned", behind || cx !== x || cy !== y);
-      t.el.classList.toggle("wr-near", t === focus || t === hover);
-    }
-    // words that land on top of each other step down one line each
-    const words = things.filter((t) => t.el).sort((a, b) => a.sy - b.sy);
-    for (let i = 1; i < words.length; i++) {
-      for (let j = 0; j < i; j++) {
-        const a = words[j], b = words[i];
-        const tooClose = Math.abs(a.sx - b.sx) < ((a.el?.offsetWidth ?? 0) + (b.el?.offsetWidth ?? 0)) / 2 && b.sy - a.sy < 30;
-        if (tooClose) b.sy = a.sy + 30;
-      }
-    }
-    for (const t of words) if (t.el) t.el.style.transform = `translate(${t.sx.toFixed(1)}px,${t.sy.toFixed(1)}px) translate(-50%,-50%)`;
-  }
-
   let raf = 0;
   let last = performance.now();
   function frame(now: number) {
@@ -1106,12 +1077,11 @@ export function createGame(opts: GameOptions): Game | null {
     } else {
       play(dt);
       if (!paused) {
-        const pointing = locked || (lockFailed && mouse.over);
         const at = aim();
-        const h = !pointing ? null : mouse.down ? hover : pick(at.x, at.y);
+        const h = mouse.down ? hover : locked || mouse.over ? pick(at.x, at.y) : null;
         if (h !== hover) {
           hover = h;
-          canvas.style.cursor = h ? "pointer" : "";
+          canvas.style.cursor = h && !locked ? "pointer" : "";
           app.classList.toggle("wr-aim", !!h);
         }
         const f = hover ?? near;
@@ -1119,15 +1089,7 @@ export function createGame(opts: GameOptions): Game | null {
           focus = f;
           opts.onFocus(f ? f.id : null);
         }
-        // the Open prompt rides on the cursor: dead centre when the mouse is captured
-        const cx = pointing ? at.x : W / 2, cy = pointing ? at.y : H / 2;
-        if (cx !== lastCx || cy !== lastCy) {
-          lastCx = cx;
-          lastCy = cy;
-          app.style.setProperty("--cx", `${cx.toFixed(0)}px`);
-          app.style.setProperty("--cy", `${cy.toFixed(0)}px`);
-        }
-        placeLabels();
+        placePrompt();
       }
       // side sheet on wide screens, bottom sheet (72% tall) on narrow ones
       const want = sheetOpen && W > 640 ? Math.min(SHEET_W, W) / 2 : 0;
@@ -1197,7 +1159,6 @@ export function createGame(opts: GameOptions): Game | null {
       document.removeEventListener("mousemove", onMouseMove);
       if (document.pointerLockElement === canvas) document.exitPointerLock();
       app.classList.remove("wr-locked", "wr-aim");
-      for (const t of things) t.el?.remove();
       scene.traverse((o) => {
         const m = o as THREE.Mesh | THREE.Points;
         if (m.geometry) m.geometry.dispose();
