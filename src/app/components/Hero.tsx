@@ -16,7 +16,8 @@ const Hero = () => {
 
       {/* Introduction Message */}
       <div className="text-sm text-center text-gray-600 dark:text-zinc-300 mt-4 px-6 py-3 border dark:border-zinc-700 rounded-full max-w-xl">
-        build things from painpoint, usually others', sometimes mines. I code and occasionally pitch at startup competitions.
+        build things from painpoint, usually others&apos;,sometimes mines. I code and occasionally pitch at startup competitions.
+      </div>
     </div>
   );
 };
