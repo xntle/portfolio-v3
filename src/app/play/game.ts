@@ -745,8 +745,6 @@ export function createGame(opts: GameOptions): Game | null {
   let locked = false;
   let everLocked = false;
   const CEILING = 0.62; // radians: how far up you can look
-  const PUSH_FREE = 0.3; // radians of pushing past the ceiling before the mouse is freed
-  let pushedUp = 0;
   let lockFailed = typeof canvas.requestPointerLock !== "function";
   const finePointer = window.matchMedia("(pointer: fine)").matches;
   const lock = () => {
@@ -773,17 +771,8 @@ export function createGame(opts: GameOptions): Game | null {
   const onMouseMove = (e: MouseEvent) => {
     if (!locked || state !== "play" || paused || auto || cine) return;
     yaw -= e.movementX * 0.0022;
-    const want = pitch - e.movementY * 0.0022;
-    pitch = Math.max(-1.2, Math.min(CEILING, want));
-    // The ceiling is as far up as you can look. Keep pushing against it and the
-    // mouse is let go, so it can reach the links at the top.
-    if (want > CEILING) {
-      pushedUp += want - CEILING;
-      if (pushedUp > PUSH_FREE) {
-        pushedUp = 0;
-        document.exitPointerLock();
-      }
-    } else if (e.movementY > 0) pushedUp = 0;
+    // the ceiling is as far up as you can look
+    pitch = Math.max(-1.2, Math.min(CEILING, pitch - e.movementY * 0.0022));
   };
   document.addEventListener("pointerlockchange", onLockChange);
   document.addEventListener("pointerlockerror", onLockError);

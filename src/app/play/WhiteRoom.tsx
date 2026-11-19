@@ -235,7 +235,7 @@ export default function WhiteRoom() {
             {coarse
               ? "Left thumb moves · Right thumb looks · Walk up to an item"
               : locked
-                ? "Mouse looks · Hold click or W A S D to walk · Click an item · Push up past the ceiling or Esc for the menu"
+                ? "Mouse looks · Hold click or W A S D to walk · Click an item · Esc frees the cursor"
                 : "Click the room to look around with your mouse"}
           </p>
         )}
