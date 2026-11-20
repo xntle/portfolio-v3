@@ -57,12 +57,17 @@ async function top(client: NonNullable<ReturnType<typeof db>>) {
 }
 
 export async function GET() {
+  // `why` says what is missing when the board is off. It names settings, never their values.
   const client = db();
-  if (!client) return NextResponse.json({ enabled: false, scores: [] });
+  if (!client) {
+    const why = !process.env.NEXT_PUBLIC_SUPABASE_URL ? "NEXT_PUBLIC_SUPABASE_URL is not set" : "SUPABASE_SERVICE_ROLE_KEY is not set";
+    return NextResponse.json({ enabled: false, scores: [], why });
+  }
   try {
     return NextResponse.json({ enabled: true, scores: await top(client) });
-  } catch {
-    return NextResponse.json({ enabled: false, scores: [] });
+  } catch (e) {
+    const err = e as { code?: string; message?: string };
+    return NextResponse.json({ enabled: false, scores: [], why: `database: ${err.code ?? ""} ${err.message ?? "error"}`.slice(0, 160) });
   }
 }
 
