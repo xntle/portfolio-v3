@@ -67,7 +67,17 @@ export async function GET() {
     return NextResponse.json({ enabled: true, scores: await top(client) });
   } catch (e) {
     const err = e as { code?: string; message?: string };
-    return NextResponse.json({ enabled: false, scores: [], why: `database: ${err.code ?? ""} ${err.message ?? "error"}`.slice(0, 160) });
+    // which project, and what kind of key (its type and length only, never the key)
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "", key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+    const kind = key.startsWith("sb_secret_") ? "secret" : key.startsWith("sb_publishable_") ? "publishable" : key.startsWith("eyJ") ? "legacy jwt" : "unrecognised";
+    const tidy = key === key.trim() && !/["'=\s]/.test(key);
+    return NextResponse.json({
+      enabled: false,
+      scores: [],
+      why: `database: ${err.code ?? ""} ${err.message ?? "error"}`.slice(0, 160),
+      project: url.replace(/^https?:\/\//, "").slice(0, 60),
+      key: `${kind}, ${key.length} characters${tidy ? "" : ", has stray spaces, quotes or an equals sign"}`,
+    });
   }
 }
 
