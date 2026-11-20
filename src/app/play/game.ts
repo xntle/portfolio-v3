@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { NAV, ROOM, type Thing, type ThingId } from "./room";
-import { BOARD_MM, DARTS_PER_ROUND, ORDER, scoreDart, type DartHit, type DartsState } from "./darts";
+import { BOARD_MM, dartsAllowed, ORDER, scoreDart, type DartHit, type DartsState } from "./darts";
 import { createAudio } from "./audio";
 
 // The white room: a first-person walk through stippled furniture.
@@ -21,6 +21,8 @@ export type GameOptions = {
   onLock: (locked: boolean) => void;
   /** The dart game at the dartboard: its score while you are playing, null once you leave. */
   onDarts: (darts: DartsState | null) => void;
+  /** You went through the door into the closet (true) or came back out (false). */
+  onCloset: (inside: boolean) => void;
 };
 
 export type Game = {
@@ -32,6 +34,8 @@ export type Game = {
   say: () => void;
   /** Step away from the dartboard. */
   leaveDarts: () => void;
+  /** Come back out of the closet behind the door. */
+  leaveCloset: () => void;
   /** Leave your shoes at the entrance. */
   takeShoesOff: () => void;
   setMuted: (muted: boolean) => void;
@@ -684,10 +688,11 @@ export function createGame(opts: GameOptions): Game | null {
 
   function titlePose() {
     const wide = W / H > 1;
-    vA.set(0, wide ? 1.3 : 1.45, START_Z + (wide ? 3.8 : 3.7));
+    vA.set(wide ? 0.6 : 0, wide ? 1.3 : 1.45, START_Z + (wide ? 3.8 : 3.7));
     tmpCam.position.copy(vA);
-    // wide: aim high so the head sits near the middle, with room for the words on top of it
-    tmpCam.lookAt(0, wide ? 1.45 : 0.5, START_Z);
+    // wide: aim left of the figure so it stands in the right half, seen a little from the side
+    if (wide) tmpCam.lookAt(-1.0, 1.0, START_Z);
+    else tmpCam.lookAt(0, 1.2, START_Z);
     qA.copy(tmpCam.quaternion);
     // where the top of the figure's head is on screen: the words sit on it
     tmpCam.fov = camera.fov;
@@ -785,10 +790,11 @@ export function createGame(opts: GameOptions): Game | null {
       el.style.transform = `translate(${((hitP.x * 0.5 + 0.5) * W).toFixed(1)}px,${((-hitP.y * 0.5 + 0.5) * H).toFixed(1)}px) translate(-50%,-50%)`;
     });
   }
+  const dartsLeft = () => dartsAllowed(dartHits.map((h) => h.points)) - dartHits.length;
   const sendDarts = () =>
     opts.onDarts(
       dartsOn
-        ? { hits: dartHits.slice(), total: dartHits.reduce((sum, h) => sum + h.points, 0), left: DARTS_PER_ROUND - dartHits.length }
+        ? { hits: dartHits.slice(), total: dartHits.reduce((sum, h) => sum + h.points, 0), left: dartsLeft() }
         : null,
     );
   function clearDarts() {
@@ -827,7 +833,7 @@ export function createGame(opts: GameOptions): Game | null {
   }
   function throwDart() {
     if (!dartsOn || darts.some((d) => d.t < 1)) return;
-    if (dartHits.length >= DARTS_PER_ROUND) {
+    if (dartsLeft() <= 0) {
       // round over: the next click starts a new one
       clearDarts();
       sendDarts();
@@ -847,6 +853,8 @@ export function createGame(opts: GameOptions): Game | null {
     d.obj.position.copy(d.to);
     dartHits.push(d.hit);
     sendDarts();
+    // round over: hand the cursor back so a name can be typed for the leaderboard
+    if (dartsLeft() <= 0 && locked) document.exitPointerLock();
   }
   /** Each frame while you are at the board: hold the view on it, shake, fly the darts. */
   function playDarts(dt: number) {
@@ -891,7 +899,88 @@ export function createGame(opts: GameOptions): Game | null {
   }
   /** Shortest way round from angle `b` to angle `a`. */
   const turnTo = (a: number, b: number) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
-  const open = (id: ThingId) => (id === "darts" ? enterDarts() : opts.onOpen(id));
+  /* ---------- the closet behind the door ----------
+     The door does not open a sheet either. Behind it the room is black and the
+     dust is white, and the thing in there is the AI: it got this big from being
+     fed too much data. The page lays the contacts and the chat over it. */
+  const closet = new THREE.Scene();
+  const monster = new THREE.Group();
+  closet.add(monster);
+  {
+    const m = solidMat();
+    const ex: number[] = [];
+    // a blob: a soft mound that has settled under its own weight, no neck, no legs
+    const LEAN = 0.25;
+    sph(monster, m, 3.4, 0, 1.5, 0).scale.set(1.4, 0.6, 1.15); // where he has pooled on the floor
+    sph(monster, m, 2.75, 0, 3.3, 0).scale.set(1.12, 1, 1);
+    sph(monster, m, 1.9, LEAN, 5.3, 0).scale.set(1, 1.06, 1);
+    for (const side of [-1, 1]) {
+      sph(monster, m, 0.8, side * 3.0, 3.2, 0.9).scale.set(1.3, 0.8, 0.85); // stubs where arms might be
+      sph(monster, m, 0.75, side * 4.1, 0.45, 0.7).scale.set(1.2, 0.6, 1); // lumps that have run off him
+      sph(monster, m, 0.6, side * 2.5, 0.38, 2.6).scale.set(1.2, 0.6, 1);
+      // two small eyes, packed solid so they read as lit
+      for (let i = 0; i < 520; i++) {
+        const an = rnd() * TAU, rr = 0.15 * Math.sqrt(rnd());
+        ex.push(LEAN + side * 0.55 + Math.cos(an) * rr, 5.62 + Math.sin(an) * rr, 1.83);
+      }
+    }
+    // and a small, unbothered mouth
+    for (let i = 0; i < 420; i++) {
+      const u = rnd() * 2 - 1;
+      ex.push(LEAN + u * 0.42, 5.12 - (1 - u * u) * 0.07 + gauss() * 0.012, 1.86);
+    }
+    // the data he is still being fed, drifting in from all round
+    for (let i = 0; i < 2600; i++) {
+      const an = rnd() * TAU, far = 3.4 + rnd() * rnd() * 7, y = 0.4 + rnd() * 8.5;
+      ex.push(Math.cos(an) * far * 1.25, y, Math.sin(an) * far - 0.5);
+    }
+    // the rail and hangers over his head: this is a closet, after all
+    for (let i = 0; i < 900; i++) ex.push(-7 + rnd() * 14, 9.1 + gauss() * 0.02, -1.6);
+    for (const hx of [-5.6, -4.3, 3.9, 5.2, 6.1]) {
+      for (let k = 0; k < 260; k++) {
+        const u = rnd(), sideK = rnd() < 0.5 ? -1 : 1;
+        if (rnd() < 0.3) ex.push(hx + (rnd() * 2 - 1) * 0.5, 8.45 + gauss() * 0.01, -1.6);
+        else ex.push(hx + sideK * 0.5 * u, 9.0 - 0.55 * u, -1.6);
+      }
+    }
+    const pts = stipple(monster, 700, 0.06, ex);
+    (pts.material as THREE.ShaderMaterial).uniforms.uColor.value.set(0xf8f8f7);
+  }
+  let closetOn = false;
+  let closetT = 0;
+  function enterCloset() {
+    if (closetOn || paused || state !== "play") return;
+    leaveDarts();
+    closetOn = true;
+    closetT = 0;
+    keys = {};
+    auto = null;
+    mouse.down = false;
+    renderer.setClearColor(0x000000, 1);
+    if (locked) document.exitPointerLock(); // the contacts and the chat need a cursor
+    opts.onCloset(true);
+  }
+  function leaveCloset() {
+    if (!closetOn) return;
+    closetOn = false;
+    renderer.setClearColor(PAPER, 1);
+    opts.onCloset(false);
+  }
+  /** Each frame in the closet: stand at his feet and look up; he breathes. */
+  function playCloset(dt: number) {
+    closetT += dt;
+    const back = W / H < 1 ? 15 : 11.5;
+    const px = mouse.over ? mouse.nx : 0, py = mouse.over ? mouse.ny : 0;
+    // look low, so he fills the top of the view and the chat sits under him
+    camera.position.set(px * 0.5, EYE, back);
+    camera.lookAt(px * -0.4, (W / H < 1 ? 1.6 : 2.2) - py * 0.35, 0);
+    if (!reduced) {
+      const breath = Math.sin(closetT * 1.1);
+      monster.scale.set(1 + breath * 0.012, 1 + breath * 0.02, 1 + breath * 0.012);
+      monster.rotation.y = Math.sin(closetT * 0.3) * 0.06;
+    }
+  }
+  const open = (id: ThingId) => (id === "darts" ? enterDarts() : id === "door" ? enterCloset() : opts.onOpen(id));
 
   function activate(t: Live) {
     if (state !== "play" || paused) return;
@@ -905,9 +994,15 @@ export function createGame(opts: GameOptions): Game | null {
   };
   const keyName = (e: KeyboardEvent) => (e.key.length === 1 ? e.key.toLowerCase() : e.key);
 
+  const typing = (e: KeyboardEvent) => e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
   const onKeyDown = (e: KeyboardEvent) => {
-    if (state !== "play" || paused) return;
+    if (state !== "play" || paused || typing(e)) return;
     const k = keyName(e);
+    if (closetOn) {
+      // walking is how you leave
+      if (/^(w|a|s|d|ArrowUp|ArrowDown|ArrowLeft|ArrowRight)$/.test(k)) leaveCloset();
+      return;
+    }
     if (dartsOn) {
       if (k === " " || k === "Enter") {
         throwDart();
@@ -1060,7 +1155,7 @@ export function createGame(opts: GameOptions): Game | null {
     mouse.down = false;
   };
   const onWheel = (e: WheelEvent) => {
-    if (state !== "play" || paused) return;
+    if (state !== "play" || paused || closetOn || dartsOn) return;
     e.preventDefault();
     auto = null;
     wheelPush = Math.max(-1.5, Math.min(1.5, wheelPush - e.deltaY * 0.004));
@@ -1072,7 +1167,7 @@ export function createGame(opts: GameOptions): Game | null {
   const knob = opts.stick.firstElementChild as HTMLElement | null;
 
   const onPointerDown = (e: PointerEvent) => {
-    if (state !== "play" || paused) return;
+    if (state !== "play" || paused || closetOn) return;
     if (dartsOn) {
       if (e.pointerType === "mouse" && e.button !== 0) return;
       // aim where you pressed (unless the mouse is captured, then it is already aimed)
@@ -1145,7 +1240,7 @@ export function createGame(opts: GameOptions): Game | null {
     }
   };
   const onPointerEnd = (e: PointerEvent) => {
-    if (dartsOn) return;
+    if (dartsOn || closetOn) return;
     if (e.pointerType === "mouse") {
       // a quick click (not a hold) on an item walks you to it
       if (mouse.down && mouse.held < 0.3 && !mouse.dragged && state === "play" && !paused) {
@@ -1190,6 +1285,10 @@ export function createGame(opts: GameOptions): Game | null {
   function play(dt: number) {
     let moving = 0;
     zoom(dt);
+    if (closetOn) {
+      playCloset(dt);
+      return;
+    }
     if (dartsOn && !paused) {
       playDarts(dt);
     } else if (cine) {
@@ -1306,13 +1405,13 @@ export function createGame(opts: GameOptions): Game | null {
       play(dt);
       if (!paused) {
         const at = aim();
-        const h = dartsOn ? null : mouse.down ? hover : locked || mouse.over ? pick(at.x, at.y) : null;
+        const h = dartsOn || closetOn ? null : mouse.down ? hover : locked || mouse.over ? pick(at.x, at.y) : null;
         if (h !== hover) {
           hover = h;
           canvas.style.cursor = h && !locked ? "pointer" : "";
           app.classList.toggle("wr-aim", !!h);
         }
-        const f = dartsOn ? null : hover ?? near;
+        const f = dartsOn || closetOn ? null : hover ?? near;
         if (f !== focus) {
           focus = f;
           opts.onFocus(f ? f.id : null);
@@ -1331,7 +1430,7 @@ export function createGame(opts: GameOptions): Game | null {
         applyShift();
       }
     }
-    renderer.render(scene, camera);
+    renderer.render(closetOn ? closet : scene, camera);
     raf = requestAnimationFrame(frame);
   }
   raf = requestAnimationFrame(frame);
@@ -1346,9 +1445,11 @@ export function createGame(opts: GameOptions): Game | null {
     },
     walkTo(id) {
       leaveDarts();
+      leaveCloset();
       walkTo(id);
     },
     leaveDarts,
+    leaveCloset,
     say() {
       audio.say();
     },

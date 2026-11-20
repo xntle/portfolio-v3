@@ -35,13 +35,17 @@
 /* ---------- title ----------
    A line runs out of the figure's head (--px/--py, set by the game) to what it says. */
 /* the words sit on the figure's head, with a short line going down into it */
-.wr-title { position: absolute; left: var(--gl); right: var(--gr); bottom: calc(100% - var(--py, 40%) + 38px); display: flex; flex-direction: column; align-items: center; text-align: center; pointer-events: none; transition: opacity .5s ease; }
+.wr-title { --tw: min(440px, calc(100% - var(--gl) - var(--gr))); position: absolute; left: clamp(var(--gl), calc(var(--px, 50%) - var(--tw) / 2), calc(100% - var(--gr) - var(--tw))); width: var(--tw); bottom: calc(100% - var(--py, 40%) + 38px); display: flex; flex-direction: column; align-items: center; text-align: center; pointer-events: none; transition: opacity .5s ease; }
 .wr[data-state="title"] .wr-title > * { pointer-events: auto; }
 .wr-says { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .wr-says::after { content: ""; position: absolute; left: 50%; top: calc(100% + 8px); width: 1px; height: 22px; background: var(--ink); }
 .wr-title h1 { font-size: clamp(30px, 3.4vw, 44px); line-height: 1; font-weight: 500; letter-spacing: -.04em; margin: 0; }
 .wr-lede { margin: 0; color: var(--ink-2); font-size: clamp(16px, 1.5vw, 19px); line-height: 1.4; letter-spacing: -.01em; text-wrap: pretty; }
 .wr .wr-lede a { color: var(--ink); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+/* a small note that shows on hover or keyboard focus */
+.wr-tip { position: relative; }
+.wr-tip::after { content: attr(data-tip); position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translate(-50%, 4px); background: var(--ink); color: var(--paper); border-radius: 2px; padding: 6px 9px; font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .15s ease, transform .15s ease; }
+.wr-tip:hover::after, .wr-tip:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
 .wr .wr-lede a:hover { text-decoration-thickness: 2px; }
 .wr-contact { margin: 2px 0 0; display: flex; gap: 6px; }
 .wr-contact a { display: grid; place-items: center; width: 36px; height: 36px; font-size: 18px; color: var(--ink-2); transition: color .15s ease; }
@@ -51,8 +55,9 @@
 .wr-start:hover span { transform: translateX(5px); }
 .wr:not([data-state="title"]) .wr-title { opacity: 0; pointer-events: none; }
 .wr-lede { max-width: 34ch; }
-.wr-title .wr-start { position: fixed; left: 50%; bottom: calc(clamp(28px, 9vh, 84px) + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); }
+.wr-title .wr-start { position: fixed; left: var(--px, 50%); bottom: calc(clamp(28px, 9vh, 84px) + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); }
 .wr-tall .wr-title .wr-start { left: var(--gl); right: var(--gr); transform: none; bottom: calc(28px + env(safe-area-inset-bottom, 0px)); justify-content: space-between; }
+.wr[data-state="title"] .wr-sound { display: none; }
 
 /* ---------- HUD ---------- */
 .wr-hud { transition: opacity .5s ease; }
@@ -133,6 +138,26 @@
 @keyframes wr-today { 50% { background: transparent; } }
 .wr-nogl { position: absolute; left: var(--gl); right: var(--gr); top: 64px; margin: 0; color: var(--ink-2); }
 
+/* ---------- the closet: everything flips to white on black ---------- */
+.wr.wr-closet { --paper: #000000; --sheet: #0c0c0c; --ink: #f8f8f7; --ink-2: #a5a5a0; --line: #2c2c2a; background: #000; }
+.wr-closet .wr-bottom, .wr-closet .wr-cross, .wr-closet .wr-sound { display: none; }
+.wr-closetui { position: absolute; z-index: 3; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); width: min(560px, calc(100% - var(--gl) - var(--gr))); transform: translateX(-50%); padding: 16px 18px 18px; background: color-mix(in srgb, #000 82%, transparent); border: 1px solid var(--line) !important; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; animation: wr-closet-in .5s ease; }
+@keyframes wr-closet-in { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes wr-gate-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.wr-closetui h2 { margin: 4px 0 0; font-size: clamp(26px, 3vw, 36px); line-height: 1.05; font-weight: 500; letter-spacing: -.035em; text-wrap: balance; }
+.wr-closetui p { margin: 0; color: var(--ink-2); max-width: 52ch; }
+.wr-contacts { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 0 18px; font-size: 13px; }
+.wr .wr-contacts a { display: inline-flex; align-items: center; gap: 10px; padding: 5px 0; color: var(--ink); text-decoration: none; }
+.wr .wr-contacts a:hover { text-decoration: underline; text-underline-offset: 4px; }
+.wr-said { align-self: stretch; text-align: left; min-height: 1.5em; max-height: 8em; overflow-y: auto; white-space: pre-wrap; border-left: 1px solid var(--ink); padding-left: 12px; }
+.wr-said:empty { display: none; }
+.wr-ask { display: flex; align-items: center; gap: 8px 10px; width: 100%; }
+.wr .wr-ask input { flex: 1; min-width: 0; background: var(--paper); border: 1px solid var(--ink); border-radius: 2px; padding: 10px; font: inherit; font-size: 16px; color: var(--ink); }
+.wr .wr-ask input::placeholder { color: var(--ink-2); opacity: .7; }
+.wr-ask .wr-start { padding: 12px 16px; }
+@media (max-width: 640px) { .wr-closetui { gap: 8px; } .wr-closetui p { font-size: 13px; } .wr-said { max-height: 6em; } }
+@media (prefers-reduced-motion: reduce) { .wr-closetui { animation: none; } }
+
 /* ---------- darts: played in the room, zoomed in on the board ---------- */
 .wr-reticle { position: absolute; left: 0; top: 0; width: 44px; height: 44px; margin: -22px 0 0 -22px; transform: translate(var(--ax, 50vw), var(--ay, 50vh)); pointer-events: none; border: 1.5px solid var(--ink); border-radius: 50%; background: color-mix(in srgb, var(--paper) 40%, transparent); }
 .wr-reticle::before, .wr-reticle::after { content: ""; position: absolute; left: 50%; top: 50%; background: var(--ink); }
@@ -147,6 +172,20 @@
 .wr-dartsbar p { margin: 0; }
 .wr-dartsbar .wr-tbtn { pointer-events: auto; }
 @media (max-width: 640px) { .wr-dartsbar { grid-template-columns: 1fr auto; } .wr-dartsbar p:not(.wr-count) { grid-column: 1 / -1; grid-row: 2; } }
+.wr-post { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; pointer-events: auto; border-top: 1px solid var(--line); padding-top: 10px; }
+.wr .wr-post input { flex: 1 1 120px; min-width: 0; background: var(--paper); border: 1px solid var(--ink); border-radius: 2px; padding: 9px 10px; font: inherit; font-size: 16px; color: var(--ink); }
+.wr .wr-post input::placeholder { color: var(--ink-2); opacity: .7; }
+.wr-post .wr-start { padding: 11px 14px; }
+.wr-post-note { grid-column: 1 / -1; flex-basis: 100%; color: var(--ink-2); }
+.wr-top10 { position: absolute; z-index: 2; right: var(--gr); top: calc(64px + env(safe-area-inset-top, 0px)); width: 240px; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.wr-top10 ol { list-style: none; margin: 0; padding: 0; counter-reset: place; }
+.wr-top10 li { counter-increment: place; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; padding: 5px 0; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.wr-top10 li::before { content: counter(place); font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); width: 16px; }
+.wr-top10 li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wr-top10 li b { font-weight: 500; }
+.wr-top10 p { margin: 0; color: var(--ink-2); }
+.wr-top10 li q { flex-basis: 100%; padding-left: 24px; color: var(--ink-2); font-size: 12px; line-height: 1.35; quotes: none; overflow-wrap: anywhere; }
+@media (max-width: 760px) { .wr-top10 { top: calc(88px + env(safe-area-inset-top, 0px)); width: 132px; font-size: 12px; } .wr-top10 li:nth-child(n + 6) { display: none; } .wr-top10 li { padding: 3px 0; } .wr-top10 li q { display: none; } }
 .wr-darts-on .wr-bottom, .wr-darts-on .wr-cross, .wr-darts-on .wr-sound { display: none; }
 .wr-darts-on .wr-cv { cursor: none; }
 

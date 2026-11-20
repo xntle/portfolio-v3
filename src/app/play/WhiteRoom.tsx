@@ -7,7 +7,7 @@ import { FaEnvelope, FaGithub, FaLinkedin } from "react-icons/fa";
 import { createUISFX, type CueName, type UISFXPlayer } from "uisfx";
 import { createGame, type Game, type GameState } from "./game";
 import { NAV, ROOM, type ThingId } from "./room";
-import type { DartsState } from "./darts";
+import type { DartsState, TopScore } from "./darts";
 import { SHEETS } from "./content";
 import "./play.css";
 
@@ -31,6 +31,31 @@ const CONTACT = [
 ];
 
 const DARTS_BEST = "an-room:darts-best";
+const DARTS_NAME = "an-room:darts-name";
+const VISITOR = "an-room:visitor";
+const read = (key: string) => {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null; // private window
+  }
+};
+const write = (key: string, value: string) => {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // not kept
+  }
+};
+/** A random id this browser keeps, so the leaderboard holds one row per visitor without a sign-in. */
+function visitorId() {
+  let id = read(VISITOR);
+  if (!id) {
+    id = crypto.randomUUID();
+    write(VISITOR, id);
+  }
+  return id;
+}
 // the dartboard is a game in the room, not a sheet, so the tour of sheets skips it
 const TOUR = ROOM.filter((t) => t.id !== "darts");
 
@@ -57,6 +82,16 @@ export default function WhiteRoom() {
   const [locked, setLocked] = useState(false);
   const [darts, setDarts] = useState<DartsState | null>(null);
   const [best, setBest] = useState(0);
+  // the leaderboard: null until it has loaded, and it stays hidden if it is not set up
+  const [board, setBoard] = useState<{ enabled: boolean; scores: TopScore[] } | null>(null);
+  const [name, setName] = useState("");
+  const [message, setMessage] = useState("");
+  const [post, setPost] = useState<{ state: "idle" | "sending" | "sent" | "error"; note?: string }>({ state: "idle" });
+  // the closet behind the door: black room, white monster, and he talks
+  const [closet, setCloset] = useState(false);
+  const [talk, setTalk] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [ask, setAsk] = useState("");
+  const [thinking, setThinking] = useState(false);
   const [shoesOff, setShoesOff] = useState(false);
   const [anger, setAnger] = useState(0);
   const shoesRef = useRef<HTMLButtonElement>(null);
@@ -80,7 +115,7 @@ export default function WhiteRoom() {
       sfxRef.current = null;
       void ui.destroy();
     };
-    const game = createGame({ app, canvas, stick, onState: setState, onFocus: setFocus, onOpen: setPanel, onLock: setLocked, onDarts: setDarts });
+    const game = createGame({ app, canvas, stick, onState: setState, onFocus: setFocus, onOpen: setPanel, onLock: setLocked, onDarts: setDarts, onCloset: setCloset });
     if (!game) {
       // no WebGL: skip the room, the nav still opens every section
       setNoGL(true);
@@ -103,12 +138,21 @@ export default function WhiteRoom() {
   }, [focus, state, sfx]);
   // darts: a tick for each dart that lands, and the best round is remembered
   useEffect(() => {
-    try {
-      setBest(Number(window.localStorage.getItem(DARTS_BEST)) || 0);
-    } catch {
-      // private window: no best score kept
-    }
+    setBest(Number(read(DARTS_BEST)) || 0);
+    setName(read(DARTS_NAME) ?? "");
   }, []);
+  const atBoard = darts !== null;
+  useEffect(() => {
+    if (!atBoard) return;
+    let live = true;
+    fetch("/api/darts")
+      .then((r) => r.json())
+      .then((d) => live && setBoard({ enabled: !!d.enabled, scores: d.scores ?? [] }))
+      .catch(() => live && setBoard({ enabled: false, scores: [] }));
+    return () => {
+      live = false;
+    };
+  }, [atBoard]);
   const dartCount = darts?.hits.length ?? 0;
   useEffect(() => {
     if (!darts || !dartCount) return;
@@ -116,14 +160,76 @@ export default function WhiteRoom() {
     sfx(last.points >= 25 ? "success" : last.points ? "select" : "cancel");
     if (darts.left === 0 && darts.total > best) {
       setBest(darts.total);
-      try {
-        window.localStorage.setItem(DARTS_BEST, String(darts.total));
-      } catch {
-        // not kept
-      }
+      write(DARTS_BEST, String(darts.total));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per dart that lands
   }, [dartCount]);
+  // a new round can be posted again
+  useEffect(() => {
+    if (dartCount === 0) setPost({ state: "idle" });
+  }, [dartCount]);
+
+  const postScore = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!darts || darts.left > 0 || post.state === "sending") return;
+    setPost({ state: "sending" });
+    try {
+      const res = await fetch("/api/darts", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ visitor: visitorId(), name, message, hits: darts.hits.map((h) => h.points) }),
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        setPost({ state: "error", note: d.error ?? "Could not save that." });
+        sfx("error");
+        return;
+      }
+      write(DARTS_NAME, name.trim());
+      setBoard({ enabled: true, scores: d.scores ?? [] });
+      setPost({ state: "sent" });
+      sfx("success");
+    } catch {
+      setPost({ state: "error", note: "Could not save that. Try again." });
+    }
+  };
+  useEffect(() => {
+    if (closet) sfx("open");
+  }, [closet, sfx]);
+  /** Ask the monster. He is the same AI as the chat on the classic page. */
+  const askMonster = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const question = ask.trim();
+    if (!question || thinking) return;
+    const sent = [...talk, { role: "user" as const, content: question }];
+    setTalk([...sent, { role: "assistant", content: "" }]);
+    setAsk("");
+    setThinking(true);
+    try {
+      const res = await fetch("/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(sent.slice(-12)),
+      });
+      const reader = res.ok ? res.body?.getReader() : null;
+      if (!reader) throw new Error("no reply");
+      const decoder = new TextDecoder();
+      let reply = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        reply += decoder.decode(value, { stream: true });
+        setTalk([...sent, { role: "assistant", content: reply }]);
+      }
+      if (!reply) throw new Error("empty reply");
+    } catch {
+      setTalk([...sent, { role: "assistant", content: "(he growls. something went wrong, try again in a bit.)" }]);
+    } finally {
+      setThinking(false);
+    }
+  };
+  const said = talk.filter((t) => t.role === "assistant").pop()?.content;
+  const bonus = !!darts && dartCount > 0 && dartCount % 3 === 0 && darts.left === 3;
   const hadPanel = useRef(false);
   useEffect(() => {
     if (panel) sfx("open");
@@ -174,6 +280,7 @@ export default function WhiteRoom() {
       if (e.key === "Escape") {
         close();
         gameRef.current?.leaveDarts();
+        gameRef.current?.leaveCloset();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -198,7 +305,7 @@ export default function WhiteRoom() {
   return (
     <div
       ref={appRef}
-      className={`wr ${geist.variable} ${geistMono.variable}${panel ? " wr-has-sheet" : ""}${gate ? " wr-gated" : ""}`}
+      className={`wr ${geist.variable} ${geistMono.variable}${panel ? " wr-has-sheet" : ""}${gate ? " wr-gated" : ""}${closet ? " wr-closet" : ""}`}
       data-state={state}
     >
       <canvas
@@ -248,8 +355,8 @@ export default function WhiteRoom() {
               play anything
             </a>
             {", and shipping "}
-            <a href="https://breakfree.you" target="_blank" rel="noopener noreferrer">
-              my app
+            <a className="wr-tip" href="https://breakfree.you" target="_blank" rel="noopener noreferrer" data-tip="80k+ downloads" aria-label="breakfree, 80k+ downloads">
+              breakfree
             </a>
             {" on the weekend."}
           </p>
@@ -288,6 +395,38 @@ export default function WhiteRoom() {
 
       <i className="wr-cross" aria-hidden="true" />
       {/* the Open prompt rides on the cursor */}
+      {closet && (
+        <aside className="wr-closetui" aria-label="The closet">
+          <h2>the monster in my closet.</h2>
+          <p>{"this is my ai. he got this big because i fed him too much data about myself. ask him anything about me."}</p>
+          <ul className="wr-contacts">
+            {CONTACT.map(({ label, href, Icon }) => (
+              <li key={label}>
+                <a href={href} {...(href.startsWith("mailto:") ? {} : { target: "_blank", rel: "noopener noreferrer" })}>
+                  <Icon aria-hidden="true" />
+                  {label === "Email" ? "thaianle.work@gmail.com" : label === "LinkedIn" ? "linkedin.com/in/thai-an-le" : "github.com/xntle"}
+                </a>
+              </li>
+            ))}
+          </ul>
+          <div className="wr-said" aria-live="polite">
+            {said || (thinking ? "…" : "")}
+          </div>
+          <form className="wr-ask" onSubmit={askMonster}>
+            <label className="wr-mono" htmlFor="wr-ask">
+              Ask him
+            </label>
+            <input id="wr-ask" value={ask} onChange={(e) => setAsk(e.target.value)} maxLength={300} autoComplete="off" placeholder="what does an do?" />
+            <button className="wr-start" type="submit" disabled={thinking}>
+              {thinking ? "…" : "Ask"}
+            </button>
+          </form>
+          <button className="wr-tbtn" type="button" onClick={() => gameRef.current?.leaveCloset()}>
+            <span aria-hidden="true">←</span> Back to the room <kbd>Esc</kbd>
+          </button>
+        </aside>
+      )}
+
       {darts && !panel && (
         <>
           <i className="wr-reticle" aria-hidden="true" />
@@ -305,15 +444,73 @@ export default function WhiteRoom() {
             </p>
             <p>
               {darts.left === 0
-                ? `${darts.total} with three darts${darts.total > 0 && darts.total >= best ? ". That's your best" : ""}. ${coarse ? "Tap" : "Click"} to throw again.`
-                : dartCount
-                  ? `${darts.hits[dartCount - 1].label}${darts.hits[dartCount - 1].points ? `, ${darts.hits[dartCount - 1].points}` : ""}.`
-                  : `Your hand shakes. Line it up and ${coarse ? "tap" : "click"} to throw.`}
+                ? `${darts.total} with ${dartCount} darts${darts.total > 0 && darts.total >= best ? ". That's your best" : ""}. ${coarse ? "Tap" : "Click"} the board to throw again.`
+                : bonus
+                  ? "100 or more with three darts. Three more darts."
+                  : dartCount
+                    ? `${darts.hits[dartCount - 1].label}${darts.hits[dartCount - 1].points ? `, ${darts.hits[dartCount - 1].points}` : ""}.`
+                    : `Your hand shakes. Line it up and ${coarse ? "tap" : "click"} to throw. 100 with three darts earns three more.`}
             </p>
             <button className="wr-tbtn" type="button" onClick={() => gameRef.current?.leaveDarts()}>
               <span aria-hidden="true">✕</span> Leave {!coarse && <kbd>W A S D</kbd>}
             </button>
+            {board?.enabled && darts.left === 0 && darts.total > 0 && post.state !== "sent" && (
+              <form className="wr-post" onSubmit={postScore}>
+                <label className="wr-mono" htmlFor="wr-name">
+                  Name
+                </label>
+                <input
+                  id="wr-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  maxLength={12}
+                  minLength={2}
+                  required
+                  autoComplete="nickname"
+                  spellCheck={false}
+                  placeholder="your name"
+                />
+                <label className="wr-mono" htmlFor="wr-msg">
+                  Message
+                </label>
+                <input
+                  id="wr-msg"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  maxLength={60}
+                  autoComplete="off"
+                  placeholder="say something (optional)"
+                />
+                <button className="wr-start" type="submit" disabled={post.state === "sending"}>
+                  {post.state === "sending" ? "Posting" : "Post score"}
+                </button>
+                {post.state === "error" && (
+                  <span className="wr-post-note" role="alert">
+                    {post.note}
+                  </span>
+                )}
+              </form>
+            )}
+            {post.state === "sent" && <p className="wr-post-note">Posted. You are on the board.</p>}
           </div>
+          {board?.enabled && (
+            <div className="wr-top10">
+              <span className="wr-mono">Leaderboard</span>
+              {board.scores.length ? (
+                <ol>
+                  {board.scores.map((row, i) => (
+                    <li key={i}>
+                      <span>{row.name}</span>
+                      <b>{row.score}</b>
+                      {row.message && <q>{row.message}</q>}
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p>No scores yet. Be the first.</p>
+              )}
+            </div>
+          )}
         </>
       )}
 
