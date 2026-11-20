@@ -688,10 +688,11 @@ export function createGame(opts: GameOptions): Game | null {
 
   function titlePose() {
     const wide = W / H > 1;
-    vA.set(wide ? 0.6 : 0, wide ? 1.3 : 1.45, START_Z + (wide ? 3.8 : 3.7));
+    vA.set(wide ? -1.5 : 0, wide ? 1.3 : 1.45, START_Z + (wide ? 3.8 : 3.7));
     tmpCam.position.copy(vA);
-    // wide: aim left of the figure so it stands in the right half, seen a little from the side
-    if (wide) tmpCam.lookAt(-1.0, 1.0, START_Z);
+    // wide: stand to the figure's left and aim at the middle of the room, so the
+    // room is centred and the figure stands off to the right
+    if (wide) tmpCam.lookAt(0, 0.2, -2);
     else tmpCam.lookAt(0, 1.2, START_Z);
     qA.copy(tmpCam.quaternion);
     // where the top of the figure's head is on screen: the words sit on it

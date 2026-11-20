@@ -55,7 +55,7 @@
 .wr-start:hover span { transform: translateX(5px); }
 .wr:not([data-state="title"]) .wr-title { opacity: 0; pointer-events: none; }
 .wr-lede { max-width: 34ch; }
-.wr-title .wr-start { position: fixed; left: var(--px, 50%); bottom: calc(clamp(28px, 9vh, 84px) + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); }
+.wr-title .wr-start { position: fixed; left: 50%; bottom: calc(clamp(28px, 9vh, 84px) + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); }
 .wr-tall .wr-title .wr-start { left: var(--gl); right: var(--gr); transform: none; bottom: calc(28px + env(safe-area-inset-bottom, 0px)); justify-content: space-between; }
 .wr[data-state="title"] .wr-sound { display: none; }
 

@@ -21,6 +21,7 @@ const STEP_EVERY = 0.42; // seconds between footsteps at full speed
 
 export function createAudio(sources: { at: [number, number]; src: string; max: number }[]): RoomAudio {
   let unlocked = false;
+  let heard = false; // the music has started, even if Start has not been pressed
   let muted = false;
   let sinceStep = STEP_EVERY;
 
@@ -56,9 +57,22 @@ export function createAudio(sources: { at: [number, number]; src: string; max: n
   // do not keep playing in a background tab
   const onVisibility = () => {
     if (document.hidden) quiet();
-    else if (unlocked && !muted) music.play().catch(() => {});
+    else if ((unlocked || heard) && !muted) music.play().catch(() => {});
   };
   document.addEventListener("visibilitychange", onVisibility);
+
+  // The music starts on the start screen. Browsers that block sound before a
+  // gesture get it on the first click, tap or key anywhere on the page.
+  const EARLY = ["pointerdown", "keydown", "touchstart"] as const;
+  const early = () => {
+    if (muted || document.hidden) return;
+    music.play().then(() => {
+      heard = true;
+      EARLY.forEach((e) => window.removeEventListener(e, early));
+    }).catch(() => {});
+  };
+  EARLY.forEach((e) => window.addEventListener(e, early, { passive: true }));
+  early();
 
   return {
     unlock() {
@@ -69,7 +83,7 @@ export function createAudio(sources: { at: [number, number]; src: string; max: n
     setMuted(m) {
       muted = m;
       if (m) quiet();
-      else if (unlocked) music.play().catch(() => {});
+      else if (unlocked || heard) music.play().catch(() => {});
     },
     say() {
       if (!unlocked || muted) return;
@@ -107,6 +121,7 @@ export function createAudio(sources: { at: [number, number]; src: string; max: n
     },
     dispose() {
       document.removeEventListener("visibilitychange", onVisibility);
+      EARLY.forEach((e) => window.removeEventListener(e, early));
       for (const a of all()) {
         a.pause();
         a.src = "";
