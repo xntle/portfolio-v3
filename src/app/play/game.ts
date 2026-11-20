@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { NAV, ROOM, type Thing, type ThingId } from "./room";
-import { BOARD_MM, DARTS_PER_ROUND, scoreDart, type DartHit, type DartsState } from "./darts";
+import { BOARD_MM, DARTS_PER_ROUND, ORDER, scoreDart, type DartHit, type DartsState } from "./darts";
 import { createAudio } from "./audio";
 
 // The white room: a first-person walk through stippled furniture.
@@ -756,6 +756,35 @@ export function createGame(opts: GameOptions): Game | null {
       else dartShape.push(gauss() * 0.002, (rnd() * 2 - 1) * w, z);
     }
   }
+  // The numbers round the board. Dust is too coarse to read as digits, so these
+  // are plain text placed over the board while you are zoomed in on it.
+  const numbers = document.createElement("div");
+  numbers.className = "wr-nums";
+  numbers.setAttribute("aria-hidden", "true");
+  const numberEls = ORDER.map((n) => {
+    const el = document.createElement("span");
+    el.textContent = String(n);
+    numbers.appendChild(el);
+    return el;
+  });
+  app.appendChild(numbers);
+  /** The dust swims (see the shader). Anything drawn over it has to swim the same way. */
+  function swim(w: THREE.Vector3) {
+    const sway = shared.uTime.value * 0.55;
+    w.x += 0.035 * Math.sin(sway + w.y * 2.3 + w.z * 0.6);
+    w.z += 0.035 * Math.cos(sway * 0.8 + w.y * 1.9 + w.x * 0.5);
+    w.y += 0.012 * Math.sin(sway * 1.3 + w.x * 1.7);
+    return w;
+  }
+  function placeNumbers() {
+    numberEls.forEach((el, i) => {
+      const a = (i * 18 * Math.PI) / 180;
+      hitP.copy(bC).addScaledVector(bRight, Math.sin(a) * BOARD_R * 1.14);
+      hitP.y += Math.cos(a) * BOARD_R * 1.14;
+      swim(hitP).project(camera);
+      el.style.transform = `translate(${((hitP.x * 0.5 + 0.5) * W).toFixed(1)}px,${((-hitP.y * 0.5 + 0.5) * H).toFixed(1)}px) translate(-50%,-50%)`;
+    });
+  }
   const sendDarts = () =>
     opts.onDarts(
       dartsOn
@@ -839,10 +868,14 @@ export function createGame(opts: GameOptions): Game | null {
       if (d.t >= 1) landDart(d);
     }
     if (!locked && mouse.over) aimFromScreen(mouse.x, mouse.y);
+    camera.position.set(pos.x, EYE, pos.z);
+    camera.rotation.set(pitch, yaw, 0);
+    camera.updateMatrixWorld();
+    placeNumbers();
     // the aim, shake and all, on screen
     hitP.copy(bC).addScaledVector(bRight, aimAt.u + shake.u);
     hitP.y += aimAt.v + shake.v;
-    hitP.project(camera);
+    swim(hitP).project(camera);
     app.style.setProperty("--ax", `${((hitP.x * 0.5 + 0.5) * W).toFixed(1)}px`);
     app.style.setProperty("--ay", `${((-hitP.y * 0.5 + 0.5) * H).toFixed(1)}px`);
   }
@@ -1341,6 +1374,7 @@ export function createGame(opts: GameOptions): Game | null {
     },
     dispose() {
       disposed = true;
+      numbers.remove();
       audio.dispose();
       cancelAnimationFrame(raf);
       ro.disconnect();

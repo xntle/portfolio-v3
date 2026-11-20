@@ -1,7 +1,8 @@
 // Dart scoring. The board is measured in millimetres like a real one:
 // the double ring ends 170 mm from the centre.
 
-const ORDER = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
+/** The numbers round the board, clockwise from the top. */
+export const ORDER = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
 const BULL = 6.35, OUTER_BULL = 16, TRIPLE = [99, 107], DOUBLE = [162, 170];
 
 /** Radius of the board, to the outside of the double ring. */

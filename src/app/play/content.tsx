@@ -30,26 +30,6 @@ const PROJECTS: Entry[] = [
     links: [["Website", "https://clubly.org"]],
   },
   {
-    title: "nodi ai",
-    date: "July 2024 – Aug 2024",
-    text: "Developed an AI-powered study tool that turns files into summaries, quizzes, and flashcards winning 1st place and a $1,000 grant at FlagUp, IU's startup competition.",
-    tags: ["React", "Next.js", "Node.js", "Firebase", "Gemini AI"],
-    video: "/nodi.mp4",
-    links: [["Website", "https://nori-app.vercel.app/"]],
-  },
-  {
-    title: "flock",
-    date: "Feb 2023 – Feb 2023",
-    text: "Built at SacHacks 2025, Flock helps international students navigate the U.S. visa process with personalized roadmaps, a fact-checked AI chatbot, and a peer support forum.",
-    tags: ["Next.js", "LangChain", "PostgreSQL", "TailwindCSS", "Python", "Docker", "Railway", "Vercel"],
-    video: "/flock.mp4",
-    links: [
-      ["Website", "https://sachacks2025-intlstudents.vercel.app/"],
-      ["Source", "https://github.com/PowerOfAPoint/sachacks2025-intlstudents"],
-      ["Demo", "https://www.youtube.com/watch?v=4p2W-XpW5kE&t=10s"],
-    ],
-  },
-  {
     title: "Tumor Detecting Microscope",
     date: "Oct 2023 – Mar 2024",
     text: "Facilitate rapid and precise detection of dye injections in tumors.",
@@ -80,7 +60,7 @@ const EXPERIENCE: Entry[] = [
   {
     title: "Shopify",
     sub: "Contract Software Engineer",
-    date: "Aug 2025 - Present",
+    date: "Aug 2025 - Dec 2025",
     logo: "/shopify.png",
     text: "Built Shop Mini 'Fit Check' - Clothes Recommendations and AI Try On.",
     tags: ["React", "Shop Mini SDK"],
@@ -88,7 +68,7 @@ const EXPERIENCE: Entry[] = [
   {
     title: "Aggieworks",
     sub: "Software Engineer",
-    date: "Oct 2024 - current",
+    date: "Oct 2024 - Dec 2025",
     logo: "/aw.jpeg",
     text: "Working on clubly.org, building an internal tool for UC Davis student organizations.",
     tags: ["Svelte", "SvelteKit", "PostgreSQL", "Drizzle ORM", "Hono", "R2/AWS", "TailwindCSS"],
@@ -154,7 +134,6 @@ const STORIES = {
     "When people ask me what I've been working on I show them my whiteboard.",
   bookshelf:
     "I'm currently reading The Third Door by Alex Banayan. He said life, like a nightclub, has three ways in: the front door, the VIP entrance, and the third door you fight to find yourself.",
-  door: "Please take your shoes off. This is an asian household.",
   contact: "Feel free to reach out. I'd love to connect, collaborate, or just say hi 👋",
   passport: [
     "On Dec 21, 2021, I landed in the US. I got into UC Davis for mathematics.",
@@ -354,7 +333,6 @@ export const SHEETS: Record<Exclude<ThingId, "darts">, Sheet> = {
     title: "Contact",
     body: (
       <>
-        <Say>{STORIES.door}</Say>
         <p>{STORIES.contact}</p>
         <Rows
           rows={[

@@ -138,6 +138,9 @@
 .wr-reticle::before, .wr-reticle::after { content: ""; position: absolute; left: 50%; top: 50%; background: var(--ink); }
 .wr-reticle::before { width: 1.5px; height: 62px; margin: -31px 0 0 -.75px; }
 .wr-reticle::after { height: 1.5px; width: 62px; margin: -.75px 0 0 -31px; }
+.wr-nums { position: absolute; inset: 0; pointer-events: none; overflow: hidden; opacity: 0; transition: opacity .3s ease; }
+.wr-darts-on .wr-nums { opacity: 1; transition-delay: .35s; }
+.wr-nums span { position: absolute; left: 0; top: 0; font-family: var(--font-mono); font-size: clamp(12px, 1.5vw, 17px); color: var(--ink); font-variant-numeric: tabular-nums; }
 .wr-dartsbar { position: absolute; z-index: 3; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); width: min(560px, calc(100% - var(--gl) - var(--gr))); background: var(--sheet); border: 1px solid var(--ink) !important; padding: 10px 14px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 6px 18px; pointer-events: none; }
 .wr-dartsbar .wr-count { flex-wrap: nowrap; gap: 14px; }
 .wr-dartsbar .wr-count b { font-size: 24px; }

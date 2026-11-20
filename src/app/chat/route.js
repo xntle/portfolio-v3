@@ -40,7 +40,7 @@ Co-Founder
 Doing everything for breakfree, a screen time control app (50k+ downloads, 30k+ on Instagram).
 
 Contract Software Engineer
- Shopify · Aug 2025 – Present
+ Shopify · Aug 2025 – Dec 2025
 Built Shop Mini "Fit Check" - Clothes Recommendations and AI Try On.
 
 

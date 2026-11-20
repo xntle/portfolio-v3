@@ -43,7 +43,7 @@ export default function Experience() {
       role: "Contract Software Engineer",
       company: "Shopify",
       image: "/shopify.png",
-      duration: "Aug 2025 - Present",
+      duration: "Aug 2025 - Dec 2025",
       summary:
         "Built Shop Mini 'Fit Check' - Clothes Recommendations and AI Try On.",
       bullets: [
@@ -58,7 +58,7 @@ export default function Experience() {
       role: "Software Engineer",
       company: "Aggieworks",
       image: "/aw.jpeg",
-      duration: "Oct 2024 - current",
+      duration: "Oct 2024 - Dec 2025",
       summary:
         "Working on clubly.org, building an internal tool for UC Davis student organizations.",
       bullets: [
