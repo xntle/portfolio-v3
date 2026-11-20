@@ -10,6 +10,8 @@ export type RoomAudio = {
   setMuted: (muted: boolean) => void;
   /** The host talking, for the shoes-off rule. */
   say: () => void;
+  /** Stop talking mid-word. */
+  hush: () => void;
   /** Once per frame, with the player's position and how fast they are walking (0..1). */
   update: (x: number, z: number, moving: number, dt: number) => void;
   dispose: () => void;
@@ -89,6 +91,9 @@ export function createAudio(sources: { at: [number, number]; src: string; max: n
       if (!unlocked || muted) return;
       talk.currentTime = 0;
       talk.play().catch(() => {});
+    },
+    hush() {
+      talk.pause();
     },
     update(x, z, moving, dt) {
       if (!unlocked || muted || document.hidden) return;

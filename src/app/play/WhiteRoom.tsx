@@ -92,6 +92,8 @@ export default function WhiteRoom() {
   const [talk, setTalk] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
   const [ask, setAsk] = useState("");
   const [thinking, setThinking] = useState(false);
+  const [typed, setTyped] = useState(0);
+  const [talking, setTalking] = useState(false); // the box to talk to him is out
   const [shoesOff, setShoesOff] = useState(false);
   const [anger, setAnger] = useState(0);
   const shoesRef = useRef<HTMLButtonElement>(null);
@@ -115,7 +117,7 @@ export default function WhiteRoom() {
       sfxRef.current = null;
       void ui.destroy();
     };
-    const game = createGame({ app, canvas, stick, onState: setState, onFocus: setFocus, onOpen: setPanel, onLock: setLocked, onDarts: setDarts, onCloset: setCloset });
+    const game = createGame({ app, canvas, stick, onState: setState, onFocus: setFocus, onOpen: setPanel, onLock: setLocked, onDarts: setDarts, onCloset: setCloset, onTalk: () => setTalking(true) });
     if (!game) {
       // no WebGL: skip the room, the nav still opens every section
       setNoGL(true);
@@ -195,6 +197,9 @@ export default function WhiteRoom() {
   };
   useEffect(() => {
     if (closet) sfx("open");
+    else setTalking(false);
+    // the first time you come in, he speaks first
+    if (closet) setTalk((t) => (t.length ? t : [{ role: "assistant", content: "hi stranger." }]));
   }, [closet, sfx]);
   /** Ask the monster. He is the same AI as the chat on the classic page. */
   const askMonster = async (e: React.FormEvent) => {
@@ -204,6 +209,7 @@ export default function WhiteRoom() {
     const sent = [...talk, { role: "user" as const, content: question }];
     setTalk([...sent, { role: "assistant", content: "" }]);
     setAsk("");
+    setTyped(0);
     setThinking(true);
     try {
       const res = await fetch("/chat", {
@@ -228,7 +234,23 @@ export default function WhiteRoom() {
       setThinking(false);
     }
   };
-  const said = talk.filter((t) => t.role === "assistant").pop()?.content;
+  const said = talk.filter((t) => t.role === "assistant").pop()?.content ?? "";
+  // his words come out one letter at a time, and he is heard for as long as they do
+  const speaking = closet && typed < said.length;
+  useEffect(() => {
+    if (!speaking) return;
+    const t = setTimeout(() => setTyped((n) => n + 1), 26);
+    return () => clearTimeout(t);
+  }, [speaking, typed]);
+  useEffect(() => {
+    if (!speaking) return;
+    gameRef.current?.say();
+    const voice = setInterval(() => gameRef.current?.say(), 2250);
+    return () => {
+      clearInterval(voice);
+      gameRef.current?.hush(); // he stops when the words do
+    };
+  }, [speaking]);
   const bonus = !!darts && dartCount > 0 && dartCount % 3 === 0 && darts.left === 3;
   const hadPanel = useRef(false);
   useEffect(() => {
@@ -281,6 +303,12 @@ export default function WhiteRoom() {
         close();
         gameRef.current?.leaveDarts();
         gameRef.current?.leaveCloset();
+      }
+      // in the closet, Enter puts you in the box to talk to him
+      const box = document.getElementById("wr-ask");
+      if (e.key === "Enter" && box && document.activeElement !== box) {
+        box.focus();
+        e.preventDefault();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -396,35 +424,24 @@ export default function WhiteRoom() {
       <i className="wr-cross" aria-hidden="true" />
       {/* the Open prompt rides on the cursor */}
       {closet && (
-        <aside className="wr-closetui" aria-label="The closet">
-          <h2>the monster in my closet.</h2>
-          <p>{"this is my ai. he got this big because i fed him too much data about myself. ask him anything about me."}</p>
-          <ul className="wr-contacts">
-            {CONTACT.map(({ label, href, Icon }) => (
-              <li key={label}>
-                <a href={href} {...(href.startsWith("mailto:") ? {} : { target: "_blank", rel: "noopener noreferrer" })}>
-                  <Icon aria-hidden="true" />
-                  {label === "Email" ? "thaianle.work@gmail.com" : label === "LinkedIn" ? "linkedin.com/in/thai-an-le" : "github.com/xntle"}
-                </a>
-              </li>
-            ))}
-          </ul>
-          <div className="wr-said" aria-live="polite">
-            {said || (thinking ? "…" : "")}
-          </div>
-          <form className="wr-ask" onSubmit={askMonster}>
-            <label className="wr-mono" htmlFor="wr-ask">
-              Ask him
-            </label>
-            <input id="wr-ask" value={ask} onChange={(e) => setAsk(e.target.value)} maxLength={300} autoComplete="off" placeholder="what does an do?" />
-            <button className="wr-start" type="submit" disabled={thinking}>
-              {thinking ? "…" : "Ask"}
-            </button>
-          </form>
-          <button className="wr-tbtn" type="button" onClick={() => gameRef.current?.leaveCloset()}>
-            <span aria-hidden="true">←</span> Back to the room <kbd>Esc</kbd>
-          </button>
-        </aside>
+        <>
+          {(said || thinking) && (
+            <p className="wr-bubble" aria-live="polite" aria-label={said || "thinking"}>
+              <span aria-hidden="true">{said.slice(0, typed)}</span>
+              <i className="wr-caret" aria-hidden="true" />
+            </p>
+          )}
+          {talking && (
+          <aside className="wr-closetui" aria-label="Talk to the monster in the closet">
+            <form className="wr-ask" onSubmit={askMonster}>
+              <input id="wr-ask" autoFocus value={ask} onChange={(e) => setAsk(e.target.value)} maxLength={300} autoComplete="off" aria-label="Say something to him" placeholder="say something to him" />
+              <button className="wr-start" type="submit" disabled={thinking} aria-label="Send">
+                <span aria-hidden="true">→</span>
+              </button>
+            </form>
+          </aside>
+          )}
+        </>
       )}
 
       {darts && !panel && (

@@ -23,6 +23,8 @@ export type GameOptions = {
   onDarts: (darts: DartsState | null) => void;
   /** You went through the door into the closet (true) or came back out (false). */
   onCloset: (inside: boolean) => void;
+  /** The visitor clicked the monster: time to talk. */
+  onTalk: () => void;
 };
 
 export type Game = {
@@ -32,6 +34,8 @@ export type Game = {
   setPaused: (paused: boolean, sheet?: boolean) => void;
   /** The host says something (the shoes-off rule). */
   say: () => void;
+  /** Cut the talking sound off. */
+  hush: () => void;
   /** Step away from the dartboard. */
   leaveDarts: () => void;
   /** Come back out of the closet behind the door. */
@@ -904,13 +908,26 @@ export function createGame(opts: GameOptions): Game | null {
      The door does not open a sheet either. Behind it the room is black and the
      dust is white, and the thing in there is the AI: it got this big from being
      fed too much data. The page lays the contacts and the chat over it. */
+  const CLOSET_DOOR = 19.5; // z of the doorway back to the room
+  const CLOSET_X = 9.5, CLOSET_BACK = -6.5; // the walls
+  const SHIRT_Z = 2.6;
+  /** The contacts hang in the closet as T-shirts. */
+  const SHIRTS = [
+    { label: "email", href: "mailto:thaianle.work@gmail.com", x: -3.9 },
+    { label: "linkedin", href: "https://www.linkedin.com/in/thai-an-le/", x: -2.7 },
+    { label: "github", href: "https://github.com/xntle", x: 2.9 },
+  ];
   const closet = new THREE.Scene();
-  const monster = new THREE.Group();
-  closet.add(monster);
+  const closetRoom = new THREE.Group(); // the walls, the rails, the shirts: dust that stays put
+  const monster = new THREE.Group(); // turns to face you
+  const monsterHead = new THREE.Group(); // turns a little further, hinged at the neck
+  const NECK = new THREE.Vector3(-0.34, 8.05, 0.1);
+  const HEAD = new THREE.Vector3(-0.48, 0.33, 0.05); // the middle of his head, from the neck
+  closet.add(closetRoom, monster);
+  const white = (pts: THREE.Points) => (pts.material as THREE.ShaderMaterial).uniforms.uColor.value.set(0xf8f8f7);
   {
     const m = solidMat();
-    const ex: number[] = [];
-    // tall, thin and too big for the closet: his head is bent over under the rail
+    // tall, thin and too big for the closet: his head is bent over under the ceiling
     for (const side of [-1, 1]) {
       sph(monster, m, 0.3, side * 0.4, 0.16, 0.35).scale.set(0.8, 0.5, 1.7); // feet
       stick(monster, m, side * 0.4, 0.2, 0, side * 0.42, 2.4, 0.1, 0.19); // shins
@@ -928,39 +945,124 @@ export function createGame(opts: GameOptions): Game | null {
     sph(monster, m, 0.5, 0, 4.7, 0).scale.set(1.05, 0.85, 0.75); // hips
     stick(monster, m, 0, 4.7, 0, 0.06, 6.4, 0, 0.4); // a long waist
     sph(monster, m, 0.55, 0.05, 6.75, 0).scale.set(1.25, 1.25, 0.7); // chest
-    stick(monster, m, 0.05, 7.3, 0, -0.34, 8.05, 0.1, 0.17); // the neck, bent
-    const HX = -0.82, HY = 8.38, TILT = 0.9;
-    const head = sph(monster, m, 0.52, HX, HY, 0.15);
+    stick(monster, m, 0.05, 7.3, 0, NECK.x, NECK.y, NECK.z, 0.17); // the neck, bent
+    white(stipple(monster, 2600, 0.045));
+
+    // the head is its own dust, so it can turn to look at you
+    monsterHead.position.copy(NECK);
+    monster.add(monsterHead);
+    const TILT = 0.9;
+    const head = sph(monsterHead, m, 0.52, HEAD.x, HEAD.y, HEAD.z);
     head.scale.set(0.85, 1.2, 0.9);
     head.rotation.z = TILT;
+    const eyes: number[] = [];
     // two small eyes, packed solid so they read as lit; nothing else on the face
     for (const side of [-1, 1]) {
-      const cx = HX - Math.sin(TILT) * 0.12 + side * Math.cos(TILT) * 0.2;
-      const cy = HY + Math.cos(TILT) * 0.12 + side * Math.sin(TILT) * 0.2;
+      const cx = HEAD.x - Math.sin(TILT) * 0.12 + side * Math.cos(TILT) * 0.2;
+      const cy = HEAD.y + Math.cos(TILT) * 0.12 + side * Math.sin(TILT) * 0.2;
       for (let i = 0; i < 420; i++) {
         const an = rnd() * TAU, rr = 0.075 * Math.sqrt(rnd());
-        ex.push(cx + Math.cos(an) * rr, cy + Math.sin(an) * rr, 0.66);
+        eyes.push(cx + Math.cos(an) * rr, cy + Math.sin(an) * rr, 0.56);
       }
     }
+    white(stipple(monsterHead, 2600, 0.045, eyes));
+
+    const ex: number[] = [];
     // the data he is still being fed, drifting in from all round
     for (let i = 0; i < 2600; i++) {
       const an = rnd() * TAU, far = 2 + rnd() * rnd() * 9, y = 0.4 + rnd() * 8.5;
       ex.push(Math.cos(an) * far * 1.25, y, Math.sin(an) * far - 0.5);
     }
-    // the rail and hangers over his head: this is a closet, after all
-    for (let i = 0; i < 1800; i++) ex.push(-14 + rnd() * 28, 9.1 + gauss() * 0.02, -1.6);
-    for (const hx of [-10.5, -9.2, -5.6, -4.3, 3.9, 5.2, 6.1]) {
-      for (let k = 0; k < 260; k++) {
-        const u = rnd(), sideK = rnd() < 0.5 ? -1 : 1;
-        if (rnd() < 0.3) ex.push(hx + (rnd() * 2 - 1) * 0.5, 8.45 + gauss() * 0.01, -1.6);
-        else ex.push(hx + sideK * 0.5 * u, 9.0 - 0.55 * u, -1.6);
+    // the room itself: where the walls meet the floor and the ceiling, and the corners
+    const D = CLOSET_DOOR - CLOSET_BACK;
+    for (const y of [0.01, 9.1]) {
+      for (let i = 0; i < 2600; i++) {
+        const u = rnd();
+        if (rnd() < 0.42) ex.push((u * 2 - 1) * CLOSET_X, y + gauss() * 0.015, rnd() < 0.5 ? CLOSET_BACK : CLOSET_DOOR);
+        else ex.push(rnd() < 0.5 ? -CLOSET_X : CLOSET_X, y + gauss() * 0.015, CLOSET_BACK + u * D);
       }
     }
-    const pts = stipple(monster, 2600, 0.045, ex);
-    (pts.material as THREE.ShaderMaterial).uniforms.uColor.value.set(0xf8f8f7);
+    for (const cx of [-CLOSET_X, CLOSET_X]) {
+      for (const cz of [CLOSET_BACK, CLOSET_DOOR]) for (let i = 0; i < 500; i++) ex.push(cx + gauss() * 0.015, rnd() * 9.1, cz);
+    }
+    // the way back: the doorway behind you, bright with the room on the other side
+    for (let i = 0; i < 9000; i++) ex.push((rnd() * 2 - 1) * 0.62, rnd() * 2.4, CLOSET_DOOR + gauss() * 0.01);
+    for (let i = 0; i < 1500; i++) {
+      const u = rnd(), w = 0.9 + rnd() * rnd() * 1.6; // light spilling onto the floor
+      ex.push((rnd() * 2 - 1) * 0.62 * w, 0.02, CLOSET_DOOR - u * u * 3.2);
+    }
+    // two clothes rails either side of him, at a height you can reach
+    const RAIL_Y = 2.2;
+    for (const [x0, x1] of [[-4.9, -1.9], [1.9, 4.9]]) {
+      for (let i = 0; i < 700; i++) ex.push(x0 + rnd() * (x1 - x0), RAIL_Y + gauss() * 0.012, SHIRT_Z);
+      for (const px of [x0, x1]) for (let i = 0; i < 420; i++) ex.push(px + gauss() * 0.012, rnd() * RAIL_Y, SHIRT_Z);
+    }
+    const hanger = (hx: number) => {
+      for (let k = 0; k < 260; k++) {
+        const u = rnd(), sideK = rnd() < 0.5 ? -1 : 1;
+        if (rnd() < 0.2) ex.push(hx + gauss() * 0.008, RAIL_Y - 0.12 * u, SHIRT_Z); // the hook
+        else ex.push(hx + sideK * 0.36 * u, RAIL_Y - 0.12 - 0.17 * u + gauss() * 0.006, SHIRT_Z);
+      }
+    };
+    hanger(4.1); // one spare, with nothing on it
+    for (const sh of SHIRTS) {
+      hanger(sh.x);
+      const top = RAIL_Y - 0.27, hem = top - 0.92, half = 0.37;
+      for (let i = 0; i < 5200; i++) {
+        const x = (rnd() * 2 - 1) * half, y = hem + rnd() * (top - hem);
+        if (Math.hypot(x, y - (top + 0.03)) < 0.14) continue; // the neck
+        ex.push(sh.x + x, y, SHIRT_Z + 0.03 + gauss() * 0.008);
+      }
+      for (const side of [-1, 1]) {
+        for (let i = 0; i < 900; i++) {
+          const t = rnd(), u = rnd() * 0.26; // short sleeves, sloping off the shoulder
+          ex.push(sh.x + side * (half + t * 0.27 - u * 0.6), top - t * 0.26 - u * 0.75, SHIRT_Z + 0.03 + gauss() * 0.008);
+        }
+      }
+    }
+    white(stipple(closetRoom, 1, 0.045, ex));
+  }
+  // What each shirt says. Dust is too coarse for letters, so these are plain
+  // text kept over the shirts, like the numbers round the dartboard.
+  const shirtTags = document.createElement("div");
+  shirtTags.className = "wr-shirts";
+  shirtTags.setAttribute("aria-hidden", "true");
+  const shirtEls = SHIRTS.map((sh) => {
+    const el = document.createElement("span");
+    el.textContent = sh.label;
+    shirtTags.appendChild(el);
+    return el;
+  });
+  app.appendChild(shirtTags);
+  const segA = new THREE.Vector3(0, 0.3, 0), segB = new THREE.Vector3(0, 8.6, 0);
+  /** What in the closet is under a point on screen: him, a shirt, or nothing. */
+  function closetPick(x: number, y: number): "monster" | number | null {
+    ndc.set((x / W) * 2 - 1, -(y / H) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    for (let i = 0; i < SHIRTS.length; i++) {
+      if (ray.ray.distanceSqToPoint(tmp.set(SHIRTS[i].x, 1.55, SHIRT_Z)) < 0.5 * 0.5) return i;
+    }
+    return ray.ray.distanceSqToSegment(segA, segB) < 1.15 * 1.15 ? "monster" : null;
+  }
+  /** A click or tap in the closet. True if it landed on something. */
+  function closetClick(x: number, y: number) {
+    const hit = closetPick(x, y);
+    if (hit === null) return false;
+    if (hit === "monster") {
+      if (locked) document.exitPointerLock(); // typing wants a cursor
+      opts.onTalk();
+    } else {
+      const { href } = SHIRTS[hit];
+      if (href.startsWith("mailto:")) window.location.href = href;
+      else window.open(href, "_blank", "noopener,noreferrer");
+    }
+    return true;
   }
   let closetOn = false;
   let closetT = 0;
+  /** Where you stood in the room, to put you back there. */
+  const outside = { x: 0, z: 0, yaw: 0 };
+  const closetPitch = () => (W / H < 1 ? 0.2 : 0.2); // looking up at him
   function enterCloset() {
     if (closetOn || paused || state !== "play") return;
     leaveDarts();
@@ -971,29 +1073,69 @@ export function createGame(opts: GameOptions): Game | null {
     mouse.down = false;
     renderer.setClearColor(0x000000, 1);
     if (locked) document.exitPointerLock(); // the contacts and the chat need a cursor
+    // you step in through the doorway, which stays behind you
+    outside.x = pos.x;
+    outside.z = pos.z;
+    outside.yaw = yaw;
+    pos.x = 0;
+    pos.z = W / H < 1 ? 15 : 12.5;
+    yaw = 0;
+    pitch = closetPitch();
+    wheelPush = 0;
     opts.onCloset(true);
   }
   function leaveCloset() {
     if (!closetOn) return;
     closetOn = false;
+    // back in the room, having just walked out of the door
+    pos.x = outside.x;
+    pos.z = outside.z;
+    yaw = outside.yaw + Math.PI;
+    pitch = 0;
+    keys = {};
+    wheelPush = 0;
     renderer.setClearColor(PAPER, 1);
+    app.classList.remove("wr-point");
     opts.onCloset(false);
   }
-  /** Each frame in the closet: stand at his feet and look up; he breathes. */
+  /** Each frame in the closet, after you have moved: he breathes, and the doorway lets you out. */
   function playCloset(dt: number) {
     closetT += dt;
-    const tall = W / H < 1;
-    const back = tall ? 14 : 10.5;
-    // wide screens: he stands off to one side, clear of the chat
-    monster.position.x = tall ? 0 : 4.2;
-    const px = mouse.over ? mouse.nx : 0, py = mouse.over ? mouse.ny : 0;
-    camera.position.set(px * 0.5, EYE, back);
-    camera.lookAt(px * -0.4, (tall ? 3.4 : 4.9) - py * 0.35, 0);
+    if (pos.z > CLOSET_DOOR - 1 && Math.abs(pos.x) < 0.9) {
+      leaveCloset();
+      return;
+    }
+    // he keeps facing you: the body comes round slowly, the head gets there first
+    const face = Math.atan2(pos.x, pos.z), dist = Math.hypot(pos.x, pos.z);
+    const idle = reduced ? 0 : Math.sin(closetT * 0.6) * 0.05;
+    monster.rotation.y += angDiff(face, monster.rotation.y) * (reduced ? 1 : Math.min(1, dt * 0.8));
+    const lead = Math.max(-0.8, Math.min(0.8, angDiff(face, monster.rotation.y)));
+    const down = Math.min(0.75, Math.atan2(8.4 - EYE, dist) * 0.8);
+    monsterHead.rotation.y += (lead + idle - monsterHead.rotation.y) * Math.min(1, dt * 3);
+    monsterHead.rotation.x += (down - monsterHead.rotation.x) * Math.min(1, dt * 2.5);
     if (!reduced) {
       const breath = Math.sin(closetT * 1.1);
       monster.scale.set(1 + breath * 0.01, 1 + breath * 0.006, 1 + breath * 0.01);
-      monster.rotation.y = Math.sin(closetT * 0.3) * 0.04;
     }
+    // where his head is on screen, for what he says
+    camera.updateMatrixWorld();
+    monster.updateMatrixWorld(true);
+    tmp.copy(HEAD).applyMatrix4(monsterHead.matrixWorld).project(camera);
+    app.style.setProperty("--mx", `${((tmp.x * 0.5 + 0.5) * W).toFixed(1)}px`);
+    app.style.setProperty("--my", `${((-tmp.y * 0.5 + 0.5) * H).toFixed(1)}px`);
+    // the words on the shirts
+    const ppu = H / (2 * Math.tan((camera.fov * Math.PI) / 360));
+    shirtEls.forEach((el, i) => {
+      const d = Math.hypot(SHIRTS[i].x - pos.x, SHIRT_Z - pos.z);
+      swim(tmp.set(SHIRTS[i].x, 1.55, SHIRT_Z + 0.03)).project(camera);
+      const seen = tmp.z < 1 && pos.z > SHIRT_Z + 0.3;
+      el.style.opacity = seen ? "1" : "0";
+      if (!seen) return;
+      el.style.fontSize = `${Math.max(5, (0.105 * ppu) / d).toFixed(1)}px`;
+      el.style.transform = `translate(${((tmp.x * 0.5 + 0.5) * W).toFixed(1)}px,${((-tmp.y * 0.5 + 0.5) * H).toFixed(1)}px) translate(-50%,-50%)`;
+    });
+    const at = aim();
+    app.classList.toggle("wr-point", (locked || mouse.over) && closetPick(at.x, at.y) !== null);
   }
   const open = (id: ThingId) => (id === "darts" ? enterDarts() : id === "door" ? enterCloset() : opts.onOpen(id));
 
@@ -1013,11 +1155,6 @@ export function createGame(opts: GameOptions): Game | null {
   const onKeyDown = (e: KeyboardEvent) => {
     if (state !== "play" || paused || typing(e)) return;
     const k = keyName(e);
-    if (closetOn) {
-      // walking is how you leave
-      if (/^(w|a|s|d|ArrowUp|ArrowDown|ArrowLeft|ArrowRight)$/.test(k)) leaveCloset();
-      return;
-    }
     if (dartsOn) {
       if (k === " " || k === "Enter") {
         throwDart();
@@ -1170,7 +1307,7 @@ export function createGame(opts: GameOptions): Game | null {
     mouse.down = false;
   };
   const onWheel = (e: WheelEvent) => {
-    if (state !== "play" || paused || closetOn || dartsOn) return;
+    if (state !== "play" || paused || dartsOn) return;
     e.preventDefault();
     auto = null;
     wheelPush = Math.max(-1.5, Math.min(1.5, wheelPush - e.deltaY * 0.004));
@@ -1182,7 +1319,7 @@ export function createGame(opts: GameOptions): Game | null {
   const knob = opts.stick.firstElementChild as HTMLElement | null;
 
   const onPointerDown = (e: PointerEvent) => {
-    if (state !== "play" || paused || closetOn) return;
+    if (state !== "play" || paused) return;
     if (dartsOn) {
       if (e.pointerType === "mouse" && e.button !== 0) return;
       // aim where you pressed (unless the mouse is captured, then it is already aimed)
@@ -1193,6 +1330,11 @@ export function createGame(opts: GameOptions): Game | null {
       }
       throwDart();
       return;
+    }
+    if (closetOn && (e.pointerType !== "mouse" || e.button === 0)) {
+      const r = canvas.getBoundingClientRect();
+      const at = locked ? aim() : { x: e.clientX - r.left, y: e.clientY - r.top };
+      if (closetClick(at.x, at.y)) return;
     }
     if (e.pointerType === "mouse") {
       if (e.button !== 0) return;
@@ -1255,10 +1397,10 @@ export function createGame(opts: GameOptions): Game | null {
     }
   };
   const onPointerEnd = (e: PointerEvent) => {
-    if (dartsOn || closetOn) return;
+    if (dartsOn) return;
     if (e.pointerType === "mouse") {
       // a quick click (not a hold) on an item walks you to it
-      if (mouse.down && mouse.held < 0.3 && !mouse.dragged && state === "play" && !paused) {
+      if (!closetOn && mouse.down && mouse.held < 0.3 && !mouse.dragged && state === "play" && !paused) {
         const at = aim();
         const t = pick(at.x, at.y);
         if (t) activate(t);
@@ -1285,6 +1427,17 @@ export function createGame(opts: GameOptions): Game | null {
   /* ---------- loop ---------- */
 
   function collide() {
+    if (closetOn) {
+      // the closet: four dark walls and him in the middle
+      const d = Math.hypot(pos.x, pos.z);
+      if (d < 1.9 && d > 1e-4) {
+        pos.x = (pos.x / d) * 1.9;
+        pos.z = (pos.z / d) * 1.9;
+      }
+      pos.x = Math.max(-9, Math.min(9, pos.x));
+      pos.z = Math.max(-6, Math.min(CLOSET_DOOR - 0.6, pos.z));
+      return;
+    }
     for (const t of things) {
       const dx = pos.x - t.at[0], dz = pos.z - t.at[1];
       const d = Math.hypot(dx, dz), min = t.r + 0.35;
@@ -1300,10 +1453,6 @@ export function createGame(opts: GameOptions): Game | null {
   function play(dt: number) {
     let moving = 0;
     zoom(dt);
-    if (closetOn) {
-      playCloset(dt);
-      return;
-    }
     if (dartsOn && !paused) {
       playDarts(dt);
     } else if (cine) {
@@ -1346,7 +1495,7 @@ export function createGame(opts: GameOptions): Game | null {
         if (mouse.over && !locked) {
           const ax = Math.sign(mouse.nx) * Math.max(0, Math.abs(mouse.nx) - DEAD) / (1 - DEAD);
           yaw -= ax * Math.abs(ax) * 2.0 * dt;
-          pitch += (Math.min(CEILING, -mouse.ny * 0.5) - pitch) * Math.min(1, dt * 4);
+          pitch += (Math.min(CEILING, -mouse.ny * 0.5 + (closetOn ? closetPitch() : 0)) - pitch) * Math.min(1, dt * 4);
         }
         const walking = mouse.down && mouse.held > 0.3 ? 1 : 0;
         const push = wheelPush * Math.min(1, dt * 8);
@@ -1369,10 +1518,16 @@ export function createGame(opts: GameOptions): Game | null {
       }
       collide();
     }
-    audio.update(pos.x, pos.z, moving, dt);
+    // in the closet you are nowhere near the things that hum in the room
+    audio.update(closetOn ? 999 : pos.x, closetOn ? 999 : pos.z, moving, dt);
     if (moving && !reduced) bob += dt * 9 * moving;
     camera.position.set(pos.x, EYE + (reduced ? 0 : Math.sin(bob) * 0.022), pos.z);
     camera.rotation.set(pitch, yaw, 0);
+    if (closetOn) {
+      playCloset(dt);
+      near = null;
+      return;
+    }
 
     // nearest object in reach
     let best = things[0], bestD = Infinity;
@@ -1465,6 +1620,9 @@ export function createGame(opts: GameOptions): Game | null {
     },
     leaveDarts,
     leaveCloset,
+    hush() {
+      audio.hush();
+    },
     say() {
       audio.say();
     },
@@ -1491,6 +1649,7 @@ export function createGame(opts: GameOptions): Game | null {
     dispose() {
       disposed = true;
       numbers.remove();
+      shirtTags.remove();
       audio.dispose();
       cancelAnimationFrame(raf);
       ro.disconnect();
