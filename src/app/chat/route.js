@@ -46,6 +46,9 @@ Built Shop Mini "Fit Check" - Clothes Recommendations and AI Try On.
 
 Technologies: React, Shopify API, AI Integration
 
+Software Engineer Intern
+ ANCI AI (AI scheduling agents for teams) · Jun 2025 – Sep 2025 · Palo Alto, California
+
 Software Engineer Fellow
  Headstarter · Jul 2024 – Sep 2024
 Led development of 7+ AI applications reaching over 700 users.

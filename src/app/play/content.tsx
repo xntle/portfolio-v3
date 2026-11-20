@@ -66,13 +66,10 @@ const EXPERIENCE: Entry[] = [
     tags: ["React", "Shop Mini SDK"],
   },
   {
-    title: "Aggieworks",
-    sub: "Software Engineer",
-    date: "Oct 2024 - Dec 2025",
-    logo: "/aw.jpeg",
-    text: "Working on clubly.org, building an internal tool for UC Davis student organizations.",
-    tags: ["Svelte", "SvelteKit", "PostgreSQL", "Drizzle ORM", "Hono", "R2/AWS", "TailwindCSS"],
-    links: [["clubly", "https://clubly.org"]],
+    title: "ANCI AI",
+    sub: "Software Engineer · Internship",
+    date: "Jun 2025 - Sep 2025",
+    text: "AI scheduling agents for teams. Palo Alto, California.",
   },
   {
     title: "Headstarter",
