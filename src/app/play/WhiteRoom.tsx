@@ -70,6 +70,7 @@ export default function WhiteRoom() {
     sfxRef.current?.play(cue);
   }, []);
   const stickRef = useRef<HTMLDivElement>(null);
+  const shirtsRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const gameRef = useRef<Game | null>(null);
 
@@ -94,6 +95,8 @@ export default function WhiteRoom() {
   const [thinking, setThinking] = useState(false);
   const [typed, setTyped] = useState(0);
   const [talking, setTalking] = useState(false); // the box to talk to him is out
+  const talkingRef = useRef(false);
+  talkingRef.current = talking;
   const [shoesOff, setShoesOff] = useState(false);
   const [anger, setAnger] = useState(0);
   const shoesRef = useRef<HTMLButtonElement>(null);
@@ -104,7 +107,8 @@ export default function WhiteRoom() {
     setCoarse(window.matchMedia("(pointer: coarse)").matches);
     const app = appRef.current, canvas = canvasRef.current;
     const stick = stickRef.current;
-    if (!app || !canvas || !stick) return;
+    const shirts = shirtsRef.current;
+    if (!app || !canvas || !stick || !shirts) return;
     const ui = createUISFX({ pack: "zen", volume: 0.6 });
     sfxRef.current = ui;
     // browsers only allow sound after the first click or key
@@ -117,7 +121,7 @@ export default function WhiteRoom() {
       sfxRef.current = null;
       void ui.destroy();
     };
-    const game = createGame({ app, canvas, stick, onState: setState, onFocus: setFocus, onOpen: setPanel, onLock: setLocked, onDarts: setDarts, onCloset: setCloset, onTalk: () => setTalking(true) });
+    const game = createGame({ app, canvas, stick, onState: setState, onFocus: setFocus, onOpen: setPanel, onLock: setLocked, onDarts: setDarts, onCloset: setCloset, onTalk: setTalking, shirts });
     if (!game) {
       // no WebGL: skip the room, the nav still opens every section
       setNoGL(true);
@@ -197,7 +201,6 @@ export default function WhiteRoom() {
   };
   useEffect(() => {
     if (closet) sfx("open");
-    else setTalking(false);
     // the first time you come in, he speaks first
     if (closet) setTalk((t) => (t.length ? t : [{ role: "assistant", content: "hi stranger." }]));
   }, [closet, sfx]);
@@ -212,7 +215,7 @@ export default function WhiteRoom() {
     setTyped(0);
     setThinking(true);
     try {
-      const res = await fetch("/chat", {
+      const res = await fetch("/chat?as=monster", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(sent.slice(-12)),
@@ -302,7 +305,9 @@ export default function WhiteRoom() {
       if (e.key === "Escape") {
         close();
         gameRef.current?.leaveDarts();
-        gameRef.current?.leaveCloset();
+        // the first Esc stops the talk, the next one leaves the closet
+        if (talkingRef.current) gameRef.current?.endTalk();
+        else gameRef.current?.leaveCloset();
       }
       // in the closet, Enter puts you in the box to talk to him
       const box = document.getElementById("wr-ask");
@@ -439,6 +444,9 @@ export default function WhiteRoom() {
                 <span aria-hidden="true">→</span>
               </button>
             </form>
+            <button className="wr-tbtn" type="button" onClick={() => gameRef.current?.endTalk()}>
+              <span aria-hidden="true">✕</span> Stop talking <kbd>Esc</kbd>
+            </button>
           </aside>
           )}
         </>
@@ -537,6 +545,14 @@ export default function WhiteRoom() {
         </span>
       )}
 
+      {/* the logos printed on the shirts in the closet; the game keeps them over the shirts */}
+      <div ref={shirtsRef} className="wr-shirts" aria-hidden="true">
+        {CONTACT.map(({ label, Icon }) => (
+          <span key={label}>
+            <Icon />
+          </span>
+        ))}
+      </div>
       <div ref={stickRef} className="wr-stick" hidden aria-hidden="true">
         <i />
       </div>

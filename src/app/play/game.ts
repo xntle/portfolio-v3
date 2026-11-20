@@ -23,8 +23,10 @@ export type GameOptions = {
   onDarts: (darts: DartsState | null) => void;
   /** You went through the door into the closet (true) or came back out (false). */
   onCloset: (inside: boolean) => void;
-  /** The visitor clicked the monster: time to talk. */
-  onTalk: () => void;
+  /** The visitor clicked the monster (true), or stopped talking to him (false). */
+  onTalk: (on: boolean) => void;
+  /** One child per contact, in order: the logo printed on its shirt. */
+  shirts: HTMLElement;
 };
 
 export type Game = {
@@ -40,6 +42,8 @@ export type Game = {
   leaveDarts: () => void;
   /** Come back out of the closet behind the door. */
   leaveCloset: () => void;
+  /** Stop talking to the monster, staying in the closet. */
+  endTalk: () => void;
   /** Leave your shoes at the entrance. */
   takeShoesOff: () => void;
   setMuted: (muted: boolean) => void;
@@ -913,9 +917,9 @@ export function createGame(opts: GameOptions): Game | null {
   const SHIRT_Z = 2.6;
   /** The contacts hang in the closet as T-shirts. */
   const SHIRTS = [
-    { label: "email", href: "mailto:thaianle.work@gmail.com", x: -3.9 },
-    { label: "linkedin", href: "https://www.linkedin.com/in/thai-an-le/", x: -2.7 },
-    { label: "github", href: "https://github.com/xntle", x: 2.9 },
+    { label: "Email me · thaianle.work@gmail.com", href: "mailto:thaianle.work@gmail.com", x: -3.9 },
+    { label: "LinkedIn · thai-an-le", href: "https://www.linkedin.com/in/thai-an-le/", x: -2.7 },
+    { label: "GitHub · xntle", href: "https://github.com/xntle", x: 2.9 },
   ];
   const closet = new THREE.Scene();
   const closetRoom = new THREE.Group(); // the walls, the rails, the shirts: dust that stays put
@@ -1022,18 +1026,21 @@ export function createGame(opts: GameOptions): Game | null {
     }
     white(stipple(closetRoom, 1, 0.045, ex));
   }
-  // What each shirt says. Dust is too coarse for letters, so these are plain
-  // text kept over the shirts, like the numbers round the dartboard.
-  const shirtTags = document.createElement("div");
-  shirtTags.className = "wr-shirts";
-  shirtTags.setAttribute("aria-hidden", "true");
-  const shirtEls = SHIRTS.map((sh) => {
-    const el = document.createElement("span");
-    el.textContent = sh.label;
-    shirtTags.appendChild(el);
-    return el;
-  });
-  app.appendChild(shirtTags);
+  // The logo on each shirt. Dust is too coarse to draw one, so the page hands
+  // over real ones (opts.shirts) and they are kept over the shirts, like the
+  // numbers round the dartboard.
+  const shirtEls = Array.from(opts.shirts.children) as HTMLElement[];
+  // What you are pointing at, said beside the cursor.
+  const hint = document.createElement("span");
+  hint.className = "wr-over";
+  hint.hidden = true;
+  app.appendChild(hint);
+  let talkOn = false; // facing him, with the box to talk out
+  function endTalk() {
+    if (!talkOn) return;
+    talkOn = false;
+    opts.onTalk(false);
+  }
   const segA = new THREE.Vector3(0, 0.3, 0), segB = new THREE.Vector3(0, 8.6, 0);
   /** What in the closet is under a point on screen: him, a shirt, or nothing. */
   function closetPick(x: number, y: number): "monster" | number | null {
@@ -1047,10 +1054,17 @@ export function createGame(opts: GameOptions): Game | null {
   /** A click or tap in the closet. True if it landed on something. */
   function closetClick(x: number, y: number) {
     const hit = closetPick(x, y);
-    if (hit === null) return false;
+    if (hit === null) {
+      // clicking away from him ends the talk
+      const was = talkOn;
+      endTalk();
+      return was;
+    }
     if (hit === "monster") {
       if (locked) document.exitPointerLock(); // typing wants a cursor
-      opts.onTalk();
+      keys = {};
+      talkOn = true;
+      opts.onTalk(true);
     } else {
       const { href } = SHIRTS[hit];
       if (href.startsWith("mailto:")) window.location.href = href;
@@ -1096,6 +1110,8 @@ export function createGame(opts: GameOptions): Game | null {
     wheelPush = 0;
     renderer.setClearColor(PAPER, 1);
     app.classList.remove("wr-point");
+    hint.hidden = true;
+    endTalk();
     opts.onCloset(false);
   }
   /** Each frame in the closet, after you have moved: he breathes, and the doorway lets you out. */
@@ -1127,15 +1143,23 @@ export function createGame(opts: GameOptions): Game | null {
     const ppu = H / (2 * Math.tan((camera.fov * Math.PI) / 360));
     shirtEls.forEach((el, i) => {
       const d = Math.hypot(SHIRTS[i].x - pos.x, SHIRT_Z - pos.z);
-      swim(tmp.set(SHIRTS[i].x, 1.55, SHIRT_Z + 0.03)).project(camera);
+      swim(tmp.set(SHIRTS[i].x, 1.5, SHIRT_Z + 0.03)).project(camera);
       const seen = tmp.z < 1 && pos.z > SHIRT_Z + 0.3;
       el.style.opacity = seen ? "1" : "0";
       if (!seen) return;
-      el.style.fontSize = `${Math.max(5, (0.105 * ppu) / d).toFixed(1)}px`;
+      el.style.fontSize = `${Math.max(6, (0.3 * ppu) / d).toFixed(1)}px`;
       el.style.transform = `translate(${((tmp.x * 0.5 + 0.5) * W).toFixed(1)}px,${((-tmp.y * 0.5 + 0.5) * H).toFixed(1)}px) translate(-50%,-50%)`;
     });
+    // say what is under the cursor (or the crosshair)
     const at = aim();
-    app.classList.toggle("wr-point", (locked || mouse.over) && closetPick(at.x, at.y) !== null);
+    const over = locked || mouse.over ? closetPick(at.x, at.y) : null;
+    const say = over === null || (over === "monster" && talkOn) ? "" : over === "monster" ? "Talk" : SHIRTS[over].label;
+    app.classList.toggle("wr-point", say !== "");
+    hint.hidden = say === "";
+    if (say) {
+      if (hint.textContent !== say) hint.textContent = say;
+      hint.style.transform = `translate(${at.x.toFixed(0)}px,${at.y.toFixed(0)}px) translate(-50%, 22px)`;
+    }
   }
   const open = (id: ThingId) => (id === "darts" ? enterDarts() : id === "door" ? enterCloset() : opts.onOpen(id));
 
@@ -1155,6 +1179,7 @@ export function createGame(opts: GameOptions): Game | null {
   const onKeyDown = (e: KeyboardEvent) => {
     if (state !== "play" || paused || typing(e)) return;
     const k = keyName(e);
+    if (talkOn && /^(w|a|s|d|ArrowUp|ArrowDown|ArrowLeft|ArrowRight)$/.test(k)) endTalk(); // walking off ends the talk
     if (dartsOn) {
       if (k === " " || k === "Enter") {
         throwDart();
@@ -1491,8 +1516,18 @@ export function createGame(opts: GameOptions): Game | null {
           mouse.held += dt;
           if (mouse.held > 0.3) auto = null;
         }
+        const talk = closetOn && talkOn;
+        if (talk) {
+          // talking: you stand still and look at him
+          const d = Math.hypot(pos.x, pos.z);
+          yaw += angDiff(Math.atan2(pos.x, pos.z), yaw) * Math.min(1, dt * 4);
+          pitch += (Math.min(CEILING, Math.atan2(5.4 - EYE, d)) - pitch) * Math.min(1, dt * 4);
+          wheelPush = 0;
+          mouse.down = false;
+          joy.x = joy.y = 0;
+        }
         // a free cursor still steers: toward the sides turns you, up and down tilts
-        if (mouse.over && !locked) {
+        if (mouse.over && !locked && !talk) {
           const ax = Math.sign(mouse.nx) * Math.max(0, Math.abs(mouse.nx) - DEAD) / (1 - DEAD);
           yaw -= ax * Math.abs(ax) * 2.0 * dt;
           pitch += (Math.min(CEILING, -mouse.ny * 0.5 + (closetOn ? closetPitch() : 0)) - pitch) * Math.min(1, dt * 4);
@@ -1620,6 +1655,7 @@ export function createGame(opts: GameOptions): Game | null {
     },
     leaveDarts,
     leaveCloset,
+    endTalk,
     hush() {
       audio.hush();
     },
@@ -1649,7 +1685,7 @@ export function createGame(opts: GameOptions): Game | null {
     dispose() {
       disposed = true;
       numbers.remove();
-      shirtTags.remove();
+      hint.remove();
       audio.dispose();
       cancelAnimationFrame(raf);
       ro.disconnect();
