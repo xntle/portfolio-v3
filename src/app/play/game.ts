@@ -910,41 +910,53 @@ export function createGame(opts: GameOptions): Game | null {
   {
     const m = solidMat();
     const ex: number[] = [];
-    // a blob: a soft mound that has settled under its own weight, no neck, no legs
-    const LEAN = 0.25;
-    sph(monster, m, 3.4, 0, 1.5, 0).scale.set(1.4, 0.6, 1.15); // where he has pooled on the floor
-    sph(monster, m, 2.75, 0, 3.3, 0).scale.set(1.12, 1, 1);
-    sph(monster, m, 1.9, LEAN, 5.3, 0).scale.set(1, 1.06, 1);
+    // tall, thin and too big for the closet: his head is bent over under the rail
     for (const side of [-1, 1]) {
-      sph(monster, m, 0.8, side * 3.0, 3.2, 0.9).scale.set(1.3, 0.8, 0.85); // stubs where arms might be
-      sph(monster, m, 0.75, side * 4.1, 0.45, 0.7).scale.set(1.2, 0.6, 1); // lumps that have run off him
-      sph(monster, m, 0.6, side * 2.5, 0.38, 2.6).scale.set(1.2, 0.6, 1);
-      // two small eyes, packed solid so they read as lit
-      for (let i = 0; i < 520; i++) {
-        const an = rnd() * TAU, rr = 0.15 * Math.sqrt(rnd());
-        ex.push(LEAN + side * 0.55 + Math.cos(an) * rr, 5.62 + Math.sin(an) * rr, 1.83);
+      sph(monster, m, 0.3, side * 0.4, 0.16, 0.35).scale.set(0.8, 0.5, 1.7); // feet
+      stick(monster, m, side * 0.4, 0.2, 0, side * 0.42, 2.4, 0.1, 0.19); // shins
+      stick(monster, m, side * 0.42, 2.4, 0.1, side * 0.3, 4.6, 0, 0.24); // thighs
+      sph(monster, m, 0.2, 0.05 + side * 0.72, 7.25, 0); // narrow shoulders
+      // arms that hang to his knees, the near one a little forward
+      const f = side < 0 ? 0.35 : 0.1;
+      stick(monster, m, 0.05 + side * 0.76, 7.25, 0, side * 0.98, 4.9, f * 0.5, 0.14);
+      stick(monster, m, side * 0.98, 4.9, f * 0.5, side * 0.92, 2.9, f, 0.11);
+      for (let k = 0; k < 4; k++) {
+        const fx = side * 0.92 + (k - 1.5) * 0.085;
+        stick(monster, m, fx, 2.95, f, fx + (k - 1.5) * 0.05, 2.0 + Math.abs(k - 1.5) * 0.12, f + 0.08, 0.035);
       }
     }
-    // and a small, unbothered mouth
-    for (let i = 0; i < 420; i++) {
-      const u = rnd() * 2 - 1;
-      ex.push(LEAN + u * 0.42, 5.12 - (1 - u * u) * 0.07 + gauss() * 0.012, 1.86);
+    sph(monster, m, 0.5, 0, 4.7, 0).scale.set(1.05, 0.85, 0.75); // hips
+    stick(monster, m, 0, 4.7, 0, 0.06, 6.4, 0, 0.4); // a long waist
+    sph(monster, m, 0.55, 0.05, 6.75, 0).scale.set(1.25, 1.25, 0.7); // chest
+    stick(monster, m, 0.05, 7.3, 0, -0.34, 8.05, 0.1, 0.17); // the neck, bent
+    const HX = -0.82, HY = 8.38, TILT = 0.9;
+    const head = sph(monster, m, 0.52, HX, HY, 0.15);
+    head.scale.set(0.85, 1.2, 0.9);
+    head.rotation.z = TILT;
+    // two small eyes, packed solid so they read as lit; nothing else on the face
+    for (const side of [-1, 1]) {
+      const cx = HX - Math.sin(TILT) * 0.12 + side * Math.cos(TILT) * 0.2;
+      const cy = HY + Math.cos(TILT) * 0.12 + side * Math.sin(TILT) * 0.2;
+      for (let i = 0; i < 420; i++) {
+        const an = rnd() * TAU, rr = 0.075 * Math.sqrt(rnd());
+        ex.push(cx + Math.cos(an) * rr, cy + Math.sin(an) * rr, 0.66);
+      }
     }
     // the data he is still being fed, drifting in from all round
     for (let i = 0; i < 2600; i++) {
-      const an = rnd() * TAU, far = 3.4 + rnd() * rnd() * 7, y = 0.4 + rnd() * 8.5;
+      const an = rnd() * TAU, far = 2 + rnd() * rnd() * 9, y = 0.4 + rnd() * 8.5;
       ex.push(Math.cos(an) * far * 1.25, y, Math.sin(an) * far - 0.5);
     }
     // the rail and hangers over his head: this is a closet, after all
-    for (let i = 0; i < 900; i++) ex.push(-7 + rnd() * 14, 9.1 + gauss() * 0.02, -1.6);
-    for (const hx of [-5.6, -4.3, 3.9, 5.2, 6.1]) {
+    for (let i = 0; i < 1800; i++) ex.push(-14 + rnd() * 28, 9.1 + gauss() * 0.02, -1.6);
+    for (const hx of [-10.5, -9.2, -5.6, -4.3, 3.9, 5.2, 6.1]) {
       for (let k = 0; k < 260; k++) {
         const u = rnd(), sideK = rnd() < 0.5 ? -1 : 1;
         if (rnd() < 0.3) ex.push(hx + (rnd() * 2 - 1) * 0.5, 8.45 + gauss() * 0.01, -1.6);
         else ex.push(hx + sideK * 0.5 * u, 9.0 - 0.55 * u, -1.6);
       }
     }
-    const pts = stipple(monster, 700, 0.06, ex);
+    const pts = stipple(monster, 2600, 0.045, ex);
     (pts.material as THREE.ShaderMaterial).uniforms.uColor.value.set(0xf8f8f7);
   }
   let closetOn = false;
@@ -970,15 +982,17 @@ export function createGame(opts: GameOptions): Game | null {
   /** Each frame in the closet: stand at his feet and look up; he breathes. */
   function playCloset(dt: number) {
     closetT += dt;
-    const back = W / H < 1 ? 15 : 11.5;
+    const tall = W / H < 1;
+    const back = tall ? 14 : 10.5;
+    // wide screens: he stands off to one side, clear of the chat
+    monster.position.x = tall ? 0 : 4.2;
     const px = mouse.over ? mouse.nx : 0, py = mouse.over ? mouse.ny : 0;
-    // look low, so he fills the top of the view and the chat sits under him
     camera.position.set(px * 0.5, EYE, back);
-    camera.lookAt(px * -0.4, (W / H < 1 ? 1.6 : 2.2) - py * 0.35, 0);
+    camera.lookAt(px * -0.4, (tall ? 3.4 : 4.9) - py * 0.35, 0);
     if (!reduced) {
       const breath = Math.sin(closetT * 1.1);
-      monster.scale.set(1 + breath * 0.012, 1 + breath * 0.02, 1 + breath * 0.012);
-      monster.rotation.y = Math.sin(closetT * 0.3) * 0.06;
+      monster.scale.set(1 + breath * 0.01, 1 + breath * 0.006, 1 + breath * 0.01);
+      monster.rotation.y = Math.sin(closetT * 0.3) * 0.04;
     }
   }
   const open = (id: ThingId) => (id === "darts" ? enterDarts() : id === "door" ? enterCloset() : opts.onOpen(id));
