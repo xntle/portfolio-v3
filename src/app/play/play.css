@@ -77,9 +77,19 @@
 .wr-bottom { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 var(--gr) calc(16px + env(safe-area-inset-bottom, 0px)) var(--gl); display: flex; flex-direction: column; align-items: center; gap: 14px; pointer-events: none; }
 .wr-bottom > * { pointer-events: auto; }
 .wr:not([data-state="play"]) .wr-bottom > * { pointer-events: none; }
-.wr-open { background: var(--ink); color: var(--paper) !important; border: 0; border-radius: 2px; padding: 12px 16px 12px 18px; display: flex; gap: 14px; align-items: center; font-size: 14px; }
+.wr-open { padding: 13px 20px 13px 22px; display: flex; gap: 14px; align-items: center; font-size: 14px; }
 .wr-open b { font-weight: 500; }
-.wr-hint { margin: 0; text-align: center; }
+/* the bar at the bottom is liquid glass: clear, bending the dust behind it, lit along its rim */
+.wr-hint, .wr .wr-open { position: relative; isolation: isolate; border-radius: 999px; color: var(--ink) !important;
+  background: linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,.14) 45%, rgba(255,255,255,.3));
+  -webkit-backdrop-filter: blur(9px) saturate(180%) brightness(1.05); backdrop-filter: blur(9px) saturate(180%) brightness(1.05);
+  border: 1px solid rgba(255,255,255,.75) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.95), inset 0 -1px 1px rgba(20,20,18,.07), inset 0 0 14px rgba(255,255,255,.35), 0 0 0 .5px rgba(20,20,18,.1), 0 10px 28px -10px rgba(20,20,18,.28), 0 2px 5px rgba(20,20,18,.07); }
+/* a highlight across the top, the way light catches the edge of a lens */
+.wr-hint::before, .wr .wr-open::before { content: ""; position: absolute; z-index: -1; left: 8%; right: 8%; top: 1px; height: 46%; border-radius: 999px; background: linear-gradient(180deg, rgba(255,255,255,.75), rgba(255,255,255,0)); opacity: .7; pointer-events: none; }
+.wr-hint { margin: 0; text-align: center; padding: 11px 20px; max-width: 100%; text-wrap: balance; }
+@media (max-width: 640px) { .wr-hint { border-radius: 20px; padding: 10px 16px; } .wr-hint::before { border-radius: 18px; } }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .wr-hint, .wr .wr-open { background: rgba(255,255,255,.82); } }
 .wr-has-sheet .wr-bottom { opacity: 0; pointer-events: none; }
 .wr-has-sheet .wr-bottom > * { pointer-events: none; }
 
